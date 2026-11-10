@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zufallsgenerator – Sekundarschule</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        .font-mono-num {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        @keyframes subtlePop {
+            0% { transform: scale(0.96); opacity: 0.7; }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .animate-pop {
+            animation: subtlePop 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .board-card {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
+        }
+    </style>
+    <!-- Firebase Compat SDKs (App, Auth, Firestore) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased selection:bg-indigo-100 selection:text-indigo-900">
+
+    <!-- Header / Navigation Bar -->
+    <header class="w-full bg-white border-b border-slate-200 py-3.5 px-4 md:px-8 flex flex-wrap justify-between items-center gap-3 sticky top-0 z-30 shadow-xs">
+        <div class="flex items-center space-x-3">
+            <div class="bg-indigo-600 text-white p-2 rounded-xl shadow-xs flex items-center justify-center">
+                <i data-lucide="shuffle" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="text-base md:text-lg font-bold tracking-tight text-slate-900 leading-tight">Zufallsauswahl &amp; Gruppen</h1>
+                    <!-- Cloud Sync Status Pill -->
+                    <span id="cloudStatusBadge" onclick="openAuthModal()" title="Klicken für Login & Cloud-Sync" class="cursor-pointer text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 flex items-center gap-1.5 transition-colors hover:bg-slate-200">
+                        <span class="w-2 h-2 rounded-full bg-slate-400" id="syncStatusDot"></span>
+                        <span id="cloudStatusText">Lokal</span>
+                    </span>
+                </div>
+                <div class="flex items-center gap-2 mt-0.5">
+                    <!-- Klassen-Schnellwechsler Dropdown -->
+                    <select id="classSelector" onchange="onClassChange(this.value)" class="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-2 py-0.5 focus:outline-none cursor-pointer">
+                        <!-- Dynamisch gefüllt -->
+                    </select>
+                    <span id="classStudentCount" class="text-xs text-slate-500 font-medium">23 SuS</span>
+                    <span class="text-slate-300">•</span>
+                    <!-- Anwesenheitsquote im Header -->
+                    <span id="attendanceHeaderBadge" class="text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        23 / 23 anwesend
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mode Toggle & Cloud Auth -->
+        <div class="flex items-center flex-wrap gap-2">
+            <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 text-xs font-semibold">
+                <button id="viewSingleBtn" onclick="switchMainView('single')" class="px-3 py-1.5 rounded-lg transition-all duration-200 bg-white text-indigo-700 shadow-xs">
+                    Einzelziehung
+                </button>
+                <button id="viewGroupsBtn" onclick="switchMainView('groups')" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all duration-200">
+                    Gruppen
+                </button>
+                <button id="viewAttendanceBtn" onclick="switchMainView('attendance')" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all duration-200 flex items-center gap-1">
+                    <i data-lucide="clipboard-check" class="w-3.5 h-3.5"></i>
+                    <span>Anwesenheit</span>
+                </button>
+            </div>
+
+            <!-- Klassen-Manager Button -->
+            <button onclick="openSettingsModal()" title="Klassen & Schülerlisten verwalten" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold border border-slate-200 transition-colors">
+                <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                <span class="hidden sm:inline">Klassen verwalten</span>
+            </button>
+
+            <!-- Reset Button -->
+            <button onclick="resetRounds()" title="Durchgang neu starten" class="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold border border-slate-200 transition-colors">
+                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+            </button>
+
+            <!-- Login / Sync Button -->
+            <button id="authBtn" onclick="openAuthModal()" class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs">
+                <i data-lucide="user" class="w-3.5 h-3.5"></i>
+                <span id="authBtnLabel">Login / Sync</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-5xl w-full mx-auto p-4 md:p-8 flex flex-col justify-center items-center gap-6">
+
+        <!-- VIEW 1: EINZELZIEHUNG -->
+        <div id="singleDrawSection" class="w-full flex flex-col items-center gap-6">
+            <div class="w-full flex justify-between items-center text-sm font-medium text-slate-600 px-2 max-w-2xl">
+                <div class="flex items-center gap-2">
+                    <div class="flex items-center bg-slate-200/70 p-0.5 rounded-lg text-xs font-semibold">
+                        <button id="modeUniqueBtn" onclick="setMode('unique')" class="px-2.5 py-1 rounded-md bg-white text-indigo-700 shadow-xs">Ohne Wiederholung</button>
+                        <button id="modeRepeatBtn" onclick="setMode('repeat')" class="px-2.5 py-1 rounded-md text-slate-600">Mit Wiederholung</button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 bg-white px-3 py-1 rounded-full border border-slate-200 shadow-xs">
+                    <i data-lucide="users" class="w-4 h-4 text-slate-400"></i>
+                    <span id="counterText" class="font-mono-num font-bold text-slate-800">23 von 23 noch offen</span>
+                </div>
+            </div>
+
+            <!-- Kartendisplay Beamer -->
+            <div class="w-full max-w-2xl bg-white rounded-3xl border-2 border-slate-200/90 board-card p-8 md:p-14 text-center flex flex-col items-center justify-center min-h-[260px] md:min-h-[320px] transition-all relative overflow-hidden">
+                <div class="absolute -top-24 -right-24 w-48 h-48 bg-indigo-50 rounded-full blur-2xl pointer-events-none"></div>
+                <div class="absolute -bottom-24 -left-24 w-48 h-48 bg-slate-100 rounded-full blur-2xl pointer-events-none"></div>
+
+                <span id="nameBadge" class="text-xs uppercase tracking-widest font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-150 mb-4 inline-block">
+                    Bereit zur Ziehung
+                </span>
+
+                <div id="displayName" class="text-3xl sm:text-5xl md:text-6xl font-extrabold text-slate-900 tracking-tight leading-tight select-none">
+                    – Bitte drücken –
+                </div>
+
+                <div id="subNotice" class="text-sm font-medium text-slate-400 mt-4 min-h-[20px]">
+                    Drücke den Knopf oder die <kbd class="px-2 py-0.5 bg-slate-100 border border-slate-300 rounded text-slate-600 font-mono text-xs">Leertaste</kbd>
+                </div>
+            </div>
+
+            <!-- Action Button -->
+            <div class="w-full max-w-2xl flex flex-col sm:flex-row gap-3">
+                <button id="drawBtn" onclick="pickStudent()" class="flex-1 py-5 px-8 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-2xl font-bold text-lg md:text-xl shadow-lg shadow-indigo-200 transition-all transform active:scale-[0.98] flex items-center justify-center gap-3">
+                    <i data-lucide="user-check" class="w-6 h-6"></i>
+                    <span>Nächste Schülerin / Nächster Schüler</span>
+                </button>
+            </div>
+
+            <!-- Progress Bar -->
+            <div id="progressContainer" class="w-full max-w-2xl bg-slate-200/80 h-2.5 rounded-full overflow-hidden mt-1">
+                <div id="progressBar" class="bg-indigo-600 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+
+            <!-- History -->
+            <div class="w-full max-w-2xl bg-white border border-slate-200 rounded-2xl p-5 shadow-xs mt-2">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="history" class="w-4 h-4 text-slate-500"></i>
+                        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider">Aufgerufen (<span id="pickedCount">0</span>)</h3>
+                    </div>
+                    <button id="clearHistoryBtn" onclick="resetRounds()" class="text-xs font-semibold text-slate-400 hover:text-rose-600 transition-colors">
+                        Liste leeren
+                    </button>
+                </div>
+
+                <div id="historyChips" class="flex flex-wrap gap-2 pt-3 min-h-[42px] items-center">
+                    <span class="text-xs text-slate-400 italic">Noch niemand gezogen</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 2: GRUPPEN-GENERATOR -->
+        <div id="groupsSection" class="w-full max-w-4xl hidden flex-col gap-6">
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+                <div class="flex items-center flex-wrap gap-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Einteilung nach:</span>
+                    <div class="flex items-center gap-2 bg-slate-100 p-1 rounded-xl text-xs font-semibold" id="groupTargetButtons">
+                        <button onclick="setGroupTarget('count', 5, this)" class="px-3 py-1.5 rounded-lg bg-white text-indigo-700 shadow-xs">5 Gruppen</button>
+                        <button onclick="setGroupTarget('count', 4, this)" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900">4 Gruppen</button>
+                        <button onclick="setGroupTarget('count', 3, this)" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900">3 Gruppen</button>
+                        <button onclick="setGroupTarget('size', 4, this)" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900">4er-Teams</button>
+                        <button onclick="setGroupTarget('size', 3, this)" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900">3er-Teams</button>
+                        <button onclick="setGroupTarget('size', 2, this)" class="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900">2er-Teams</button>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button onclick="generateRandomGroups()" class="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm">
+                        <i data-lucide="shuffle" class="w-3.5 h-3.5"></i>
+                        <span>Neu würfeln</span>
+                    </button>
+                    <button onclick="saveCurrentGroupsPrompt()" class="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm">
+                        <i data-lucide="save" class="w-3.5 h-3.5"></i>
+                        <span>Gruppen speichern</span>
+                    </button>
+                    <button onclick="copyGroupsToClipboard()" class="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Kopieren</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Gespeicherte Gruppen Chips -->
+            <div id="savedGroupsBar" class="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="bookmark" class="w-4 h-4 text-indigo-600"></i>
+                    <span class="text-xs font-bold text-indigo-950 uppercase">Gespeicherte Gruppen:</span>
+                    <div id="savedGroupsList" class="flex flex-wrap gap-2"></div>
+                </div>
+            </div>
+
+            <!-- Grid -->
+            <div id="groupsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        </div>
+
+        <!-- VIEW 3: ANWESENHEITSKONTROLLE -->
+        <div id="attendanceSection" class="w-full max-w-4xl hidden flex-col gap-6">
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-base font-bold text-slate-900">Anwesenheit erfassen</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Klicke auf einen Namen, um Absenzen einzutragen. Abwesende Schüler werden bei Ziehung &amp; Gruppen automatisch ignoriert.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="setAllAttendance(true)" class="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold transition-all shadow-xs">
+                        <i data-lucide="check-check" class="w-4 h-4 text-emerald-600"></i>
+                        <span>Alle anwesend</span>
+                    </button>
+                    <button onclick="setAllAttendance(false)" class="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition-all">
+                        <span>Alle abwesend</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="attendanceGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"></div>
+        </div>
+
+    </main>
+
+    <!-- MODAL: Klassen & Schülerlisten verwalten -->
+    <div id="settingsModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 flex flex-col gap-5 max-h-[92vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="layers" class="w-5 h-5 text-indigo-600"></i>
+                    <h3 class="text-base font-bold text-slate-900">Klassen &amp; Schülerlisten verwalten</h3>
+                </div>
+                <button id="modalCloseXBtn" class="text-slate-400 hover:text-slate-700 p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <!-- Formular neue Klasse -->
+            <div class="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4 flex flex-col gap-2">
+                <label for="newClassInput" class="text-xs font-bold text-indigo-950 uppercase tracking-wider">Neue Klasse hinzufügen</label>
+                <div class="flex gap-2">
+                    <input type="text" id="newClassInput" placeholder="z. B. 3Ac oder Wahlfach Informatik" class="flex-1 bg-white border border-indigo-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <button id="btnCreateClass" type="button" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 flex items-center gap-1.5">
+                        <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                        <span>Klasse erstellen</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Vorhandene Klassen Liste -->
+            <div class="flex flex-col gap-2">
+                <div class="flex justify-between items-center px-1">
+                    <span class="text-xs font-bold text-slate-600 uppercase tracking-wider">Bestehende Klassen</span>
+                    <span class="text-xs text-slate-400">Aktive Klasse ist hervorgehoben</span>
+                </div>
+                <div id="classListContainer" class="flex flex-col gap-2"></div>
+            </div>
+
+            <!-- Schülerliste textarea -->
+            <div class="flex flex-col gap-1.5 pt-2 border-t border-slate-100">
+                <div class="flex items-center justify-between">
+                    <label class="block text-xs font-bold text-slate-700">
+                        Schülerliste für: <span id="activeClassLabelInModal" class="text-indigo-600 font-extrabold"></span>
+                    </label>
+                    <span class="text-xs text-slate-400">Ein Vorname pro Zeile (Datenschutz / IDG)</span>
+                </div>
+                <textarea id="studentTextarea" rows="8" class="w-full p-3.5 rounded-xl border border-slate-200 text-sm font-sans focus:outline-none focus:ring-2 focus:ring-indigo-500 leading-relaxed text-slate-800"></textarea>
+            </div>
+
+            <div class="flex justify-between items-center pt-2 border-t border-slate-100">
+                <button id="btnResetDefaultStudents" class="text-xs font-semibold text-slate-500 hover:text-slate-800">
+                    Klassenliste zurücksetzen
+                </button>
+                <div class="flex gap-2">
+                    <button id="modalCloseBtn" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">
+                        Schliessen
+                    </button>
+                    <button id="btnSaveStudents" class="px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs">
+                        Namen speichern
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Gruppe speichern -->
+    <div id="saveGroupModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 flex flex-col gap-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="bookmark-plus" class="w-5 h-5 text-emerald-600"></i>
+                    <h3 class="text-sm font-bold text-slate-900">Gruppeneinteilung speichern</h3>
+                </div>
+                <button onclick="closeSaveGroupModal()" class="text-slate-400 hover:text-slate-700">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div>
+                <label for="saveGroupNameInput" class="block text-xs font-medium text-slate-600 mb-1.5">Bezeichnung (z. B. "Vorträge Deutsch", "Labor 4er"):</label>
+                <input type="text" id="saveGroupNameInput" placeholder="Name der Gruppierung" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white">
+            </div>
+            <div class="flex justify-end gap-2 pt-1">
+                <button onclick="closeSaveGroupModal()" class="px-3.5 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Abbrechen</button>
+                <button onclick="confirmSaveGroup()" class="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Firebase Login & Geräte-Sync -->
+    <div id="authModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 flex flex-col gap-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="cloud" class="w-5 h-5 text-indigo-600"></i>
+                    <h3 class="text-base font-bold text-slate-900" id="authModalTitle">Geräte-Synchronisation &amp; Login</h3>
+                </div>
+                <button onclick="closeAuthModal()" class="text-slate-400 hover:text-slate-700 p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Login / Profil Zustand -->
+            <div id="authStatusArea" class="text-xs text-slate-600">
+                <!-- Dynamisch: Zeigt Login-Formular oder angemeldeten Benutzer -->
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                <button onclick="closeAuthModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">
+                    Schliessen
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Benachrichtigung -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg transition-opacity duration-300 opacity-0 pointer-events-none z-50 flex items-center gap-2">
+        <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+        <span id="toastMsg">Gespeichert!</span>
+    </div>
+
+    <!-- Footer -->
+    <footer class="py-4 text-center text-xs text-slate-400 border-t border-slate-200/60 mt-auto">
+        Kanton Zürich • Sekundarschule Niveau A • Lehrkraft-Werkzeug
+    </footer>
+
+    <script>
+        // 1. Initialdaten mit deinen echten Klassenlisten (nur Vornamen)
+        const defaultClassesInitial = {
+            "2Ac": {
+                students: [
+                    "Aleksandra", "Dario", "Elin", "Emma", "Ennio", "Fabio", "Jillyanne",
+                    "Jonas", "Julia", "Juna", "Lenni", "Loan", "Luana", "Malia", "Marco",
+                    "Mia", "Mika", "Nyat", "Raphael", "Ritchy", "Sina", "Tim Janis", "Yannick"
+                ],
+                savedGroups: {},
+                absent: []
+            },
+            "2Aa": {
+                students: [
+                    "Alexander", "Anne-Sophie", "Arwen", "Chloë", "Eva Teodora", "Gregory",
+                    "Jakob", "Jasmin", "Lenny", "Lionel", "Lucas", "Lukas", "Lyan", "Miriam",
+                    "Nando", "Odin", "Salome", "Stella Marina", "Valentina Sophie", "Yannik"
+                ],
+                savedGroups: {},
+                absent: []
+            }
+        };
+
+        // 2. Deine hinterlegte Firebase-Konfiguration
+        const defaultFirebaseConfig = {
+            apiKey: "AIzaSyBHHhgjAvY0D0trm2IMxauhFp-ssw9ooz4",
+            authDomain: "zufallsgenerator-209f3.firebaseapp.com",
+            projectId: "zufallsgenerator-209f3",
+            storageBucket: "zufallsgenerator-209f3.firebasestorage.app",
+            messagingSenderId: "274439019701",
+            appId: "1:274439019701:web:b90892c5745657e39972fc",
+            measurementId: "G-LSEDXM1GP2"
+        };
+
+        // 3. Lokale Daten laden oder mit 2Ac/2Aa initialisieren
+        let classesData = JSON.parse(localStorage.getItem('sek_classes_data') || 'null');
+        if (!classesData || Object.keys(classesData).length === 0 || (!classesData['2Ac'] && !classesData['2Aa'])) {
+            classesData = JSON.parse(JSON.stringify(defaultClassesInitial));
+            localStorage.setItem('sek_classes_data', JSON.stringify(classesData));
+        }
+
+        let activeClassName = localStorage.getItem('sek_active_class') || '2Ac';
+        if (!classesData[activeClassName]) {
+            activeClassName = Object.keys(classesData)[0];
+        }
+
+        let initialStudents = [...(classesData[activeClassName]?.students || [])];
+        let savedGroupSets = classesData[activeClassName]?.savedGroups || {};
+        let absentStudents = new Set(classesData[activeClassName]?.absent || []);
+
+        let remainingStudents = [];
+        let pickedStudents = [];
+        let currentMode = 'unique';
+        let isAnimating = false;
+        let currentGroups = [];
+        let groupTargetType = 'count';
+        let groupTargetVal = 5;
+
+        // Firebase State
+        let fbApp = null;
+        let fbAuth = null;
+        let fbDb = null;
+        let currentUser = null;
+        let syncChannelPin = localStorage.getItem('sek_sync_pin') || '';
+        let unsubscribeFirestore = null;
+        let isSyncingFromCloud = false;
+        let renamingTargetClass = null;
+
+        // UI-Referenzen
+        const classSelector = document.getElementById('classSelector');
+        const classStudentCount = document.getElementById('classStudentCount');
+        const attendanceHeaderBadge = document.getElementById('attendanceHeaderBadge');
+        const displayName = document.getElementById('displayName');
+        const nameBadge = document.getElementById('nameBadge');
+        const drawBtn = document.getElementById('drawBtn');
+        const counterText = document.getElementById('counterText');
+        const historyChips = document.getElementById('historyChips');
+        const pickedCount = document.getElementById('pickedCount');
+        const progressBar = document.getElementById('progressBar');
+        const progressContainer = document.getElementById('progressContainer');
+        const modeUniqueBtn = document.getElementById('modeUniqueBtn');
+        const modeRepeatBtn = document.getElementById('modeRepeatBtn');
+        const singleDrawSection = document.getElementById('singleDrawSection');
+        const groupsSection = document.getElementById('groupsSection');
+        const attendanceSection = document.getElementById('attendanceSection');
+        const viewSingleBtn = document.getElementById('viewSingleBtn');
+        const viewGroupsBtn = document.getElementById('viewGroupsBtn');
+        const viewAttendanceBtn = document.getElementById('viewAttendanceBtn');
+        const studentTextarea = document.getElementById('studentTextarea');
+        const settingsModal = document.getElementById('settingsModal');
+        const groupsGrid = document.getElementById('groupsGrid');
+        const savedGroupsList = document.getElementById('savedGroupsList');
+        const attendanceGrid = document.getElementById('attendanceGrid');
+        const classListContainer = document.getElementById('classListContainer');
+        const newClassInput = document.getElementById('newClassInput');
+        const btnCreateClass = document.getElementById('btnCreateClass');
+        const activeClassLabelInModal = document.getElementById('activeClassLabelInModal');
+        const modalCloseXBtn = document.getElementById('modalCloseXBtn');
+        const modalCloseBtn = document.getElementById('modalCloseBtn');
+        const btnSaveStudents = document.getElementById('btnSaveStudents');
+        const btnResetDefaultStudents = document.getElementById('btnResetDefaultStudents');
+
+        function getPresentStudents() {
+            return initialStudents.filter(name => !absentStudents.has(name));
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            syncClassDropdowns();
+            renderSavedGroupsBar();
+            resetRounds();
+            updateUI();
+            setupModalEventListeners();
+            initFirebase();
+            lucide.createIcons();
+        });
+
+        // ==========================================
+        // FIREBASE AUTH & LIVE SYNCHRONISATION
+        // ==========================================
+        function initFirebase() {
+            if (!window.firebase) return;
+            try {
+                if (!firebase.apps.length) {
+                    fbApp = firebase.initializeApp(defaultFirebaseConfig);
+                } else {
+                    fbApp = firebase.app();
+                }
+                fbAuth = firebase.auth();
+                fbDb = firebase.firestore();
+
+                fbAuth.onAuthStateChanged(user => {
+                    currentUser = user;
+                    updateAuthBadge();
+                    if (user) {
+                        startFirestoreSync(`user_${user.uid}`);
+                    } else if (syncChannelPin) {
+                        startFirestoreSync(`pin_${syncChannelPin}`);
+                    } else {
+                        updateAuthBadge();
+                    }
+                });
+            } catch (err) {
+                console.warn("Firebase Init:", err);
+            }
+        }
+
+        function updateAuthBadge() {
+            const authBtnLabel = document.getElementById('authBtnLabel');
+            const cloudStatusBadge = document.getElementById('cloudStatusBadge');
+            const cloudStatusText = document.getElementById('cloudStatusText');
+            const dot = document.getElementById('syncStatusDot');
+
+            if (currentUser) {
+                authBtnLabel.innerText = currentUser.email.split('@')[0];
+                cloudStatusText.innerText = "Sync aktiv (Konto)";
+                cloudStatusBadge.className = "cursor-pointer text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1.5 transition-colors";
+                dot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+            } else if (syncChannelPin) {
+                authBtnLabel.innerText = "PIN: " + syncChannelPin;
+                cloudStatusText.innerText = "Sync aktiv (PIN)";
+                cloudStatusBadge.className = "cursor-pointer text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1.5 transition-colors";
+                dot.className = "w-2 h-2 rounded-full bg-indigo-500 animate-pulse";
+            } else {
+                authBtnLabel.innerText = "Login / Sync";
+                cloudStatusText.innerText = "Lokal (Offline)";
+                cloudStatusBadge.className = "cursor-pointer text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 flex items-center gap-1.5 transition-colors hover:bg-slate-200";
+                dot.className = "w-2 h-2 rounded-full bg-slate-400";
+            }
+            lucide.createIcons();
+        }
+
+        function openAuthModal() {
+            renderAuthModalContent();
+            document.getElementById('authModal').classList.remove('hidden');
+        }
+
+        function closeAuthModal() {
+            document.getElementById('authModal').classList.add('hidden');
+        }
+
+        function renderAuthModalContent() {
+            const container = document.getElementById('authStatusArea');
+            if (currentUser) {
+                container.innerHTML = `
+                    <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-col gap-2">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-emerald-900">Eingeloggt mit Konto</span>
+                            <span class="px-2 py-0.5 bg-emerald-200/60 text-emerald-800 rounded text-[11px] font-bold">Aktiv</span>
+                        </div>
+                        <p class="text-xs text-emerald-800">${escapeHtmlText(currentUser.email)}</p>
+                        <p class="text-[11px] text-emerald-700">Deine Klassen und Absenzen synchronisieren sich in Echtzeit auf allen Geräten, auf denen du eingeloggt bist.</p>
+                        <button onclick="handleSignOut()" class="mt-2 w-full py-2 bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 rounded-xl font-bold text-xs transition-colors">
+                            Abmelden
+                        </button>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `
+                    <div class="flex flex-col gap-4">
+                        <div class="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-4 flex flex-col gap-2.5">
+                            <span class="font-bold text-xs text-indigo-950 uppercase tracking-wider">Variante A: Schneller Schul-PIN</span>
+                            <p class="text-[11px] text-slate-600">Gib denselben PIN auf deinem Mac und Tablet ein – schon synchronisieren beide Geräte ohne Passwort.</p>
+                            <div class="flex gap-2">
+                                <input type="text" id="modalPinInput" value="${syncChannelPin}" placeholder="z. B. sek2026" class="flex-1 bg-white border border-indigo-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <button onclick="savePinSync()" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs">
+                                    Verbinden
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col gap-2.5">
+                            <span class="font-bold text-xs text-slate-700 uppercase tracking-wider">Variante B: Lehrpersonen-Login</span>
+                            <p class="text-[11px] text-slate-500">Für Multi-User-Nutzung mit eigenem Passwort.</p>
+                            <div id="authErrorMsg" class="text-xs text-rose-600 font-semibold hidden"></div>
+                            <input type="email" id="loginEmail" placeholder="lehrperson@schule.ch" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <input type="password" id="loginPassword" placeholder="Passwort" class="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <div class="flex gap-2 pt-1">
+                                <button onclick="handleEmailLogin()" class="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs">
+                                    Anmelden
+                                </button>
+                                <button onclick="handleEmailRegister()" class="flex-1 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-all">
+                                    Registrieren
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function savePinSync() {
+            const input = document.getElementById('modalPinInput');
+            const clean = input.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+            if (!clean || clean.length < 3) {
+                showToast("Bitte mind. 3 Zeichen für den PIN eingeben!");
+                return;
+            }
+            syncChannelPin = clean;
+            localStorage.setItem('sek_sync_pin', syncChannelPin);
+            startFirestoreSync(`pin_${syncChannelPin}`);
+            closeAuthModal();
+            showToast(`Mit PIN "${syncChannelPin}" verbunden!`);
+        }
+
+        function handleEmailLogin() {
+            const email = document.getElementById('loginEmail').value.trim();
+            const pass = document.getElementById('loginPassword').value.trim();
+            const errEl = document.getElementById('authErrorMsg');
+            if (!email || !pass) {
+                errEl.innerText = "Bitte E-Mail und Passwort eingeben.";
+                errEl.classList.remove('hidden');
+                return;
+            }
+            fbAuth.signInWithEmailAndPassword(email, pass)
+                .then(() => {
+                    closeAuthModal();
+                    showToast("Erfolgreich angemeldet!");
+                })
+                .catch(err => {
+                    errEl.innerText = "Fehler: " + err.message;
+                    errEl.classList.remove('hidden');
+                });
+        }
+
+        function handleEmailRegister() {
+            const email = document.getElementById('loginEmail').value.trim();
+            const pass = document.getElementById('loginPassword').value.trim();
+            const errEl = document.getElementById('authErrorMsg');
+            if (!email || pass.length < 6) {
+                errEl.innerText = "Passwort muss mind. 6 Zeichen lang sein.";
+                errEl.classList.remove('hidden');
+                return;
+            }
+            fbAuth.createUserWithEmailAndPassword(email, pass)
+                .then(() => {
+                    closeAuthModal();
+                    showToast("Konto erstellt & angemeldet!");
+                })
+                .catch(err => {
+                    errEl.innerText = "Fehler: " + err.message;
+                    errEl.classList.remove('hidden');
+                });
+        }
+
+        function handleSignOut() {
+            if (fbAuth) fbAuth.signOut();
+            syncChannelPin = '';
+            localStorage.removeItem('sek_sync_pin');
+            if (unsubscribeFirestore) unsubscribeFirestore();
+            updateAuthBadge();
+            closeAuthModal();
+            showToast("Abgemeldet. Läuft nun wieder lokal.");
+        }
+
+        function startFirestoreSync(docPath) {
+            if (!fbDb) return;
+            if (unsubscribeFirestore) unsubscribeFirestore();
+
+            const docRef = fbDb.collection("sekSync").doc(docPath);
+            updateAuthBadge();
+
+            unsubscribeFirestore = docRef.onSnapshot((docSnap) => {
+                if (docSnap.exists) {
+                    const data = docSnap.data();
+                    if (data && data.classesData) {
+                        isSyncingFromCloud = true;
+                        classesData = data.classesData;
+                        if (data.activeClassName && classesData[data.activeClassName]) {
+                            activeClassName = data.activeClassName;
+                        }
+                        loadCurrentClassData();
+                        isSyncingFromCloud = false;
+                    }
+                } else {
+                    pushDataToCloud();
+                }
+            }, (error) => {
+                console.warn("Firestore Fehler:", error);
+            });
+        }
+
+        async function pushDataToCloud() {
+            if (isSyncingFromCloud || !fbDb) return;
+            const targetId = currentUser ? `user_${currentUser.uid}` : (syncChannelPin ? `pin_${syncChannelPin}` : null);
+            if (!targetId) return;
+
+            try {
+                const docRef = fbDb.collection("sekSync").doc(targetId);
+                await docRef.set({
+                    classesData: classesData,
+                    activeClassName: activeClassName,
+                    updatedAt: new Date().toISOString()
+                }, { merge: true });
+            } catch (err) {
+                console.error("Cloud Sync Fehler:", err);
+            }
+        }
+
+        // ==========================================
+        // KLASSEN-VERWALTUNG
+        // ==========================================
+        function setupModalEventListeners() {
+            modalCloseXBtn.addEventListener('click', closeSettingsModal);
+            modalCloseBtn.addEventListener('click', closeSettingsModal);
+            btnSaveStudents.addEventListener('click', saveStudentsFromModal);
+            btnResetDefaultStudents.addEventListener('click', resetDefaultStudents);
+
+            btnCreateClass.addEventListener('click', handleCreateClass);
+            newClassInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleCreateClass();
+                }
+            });
+        }
+
+        function handleCreateClass() {
+            const rawVal = newClassInput.value.trim();
+            if (!rawVal) {
+                showToast("Bitte gib einen Klassennamen ein!");
+                newClassInput.focus();
+                return;
+            }
+
+            if (classesData[rawVal]) {
+                showToast("Diese Klasse existiert bereits!");
+                newClassInput.focus();
+                return;
+            }
+
+            // Neue leere Klasse erstellen oder mit Platzhaltern
+            classesData[rawVal] = {
+                students: ["Schüler 1", "Schüler 2", "Schüler 3"],
+                savedGroups: {},
+                absent: []
+            };
+
+            activeClassName = rawVal;
+            newClassInput.value = "";
+            saveAllClassesToStorage();
+            loadCurrentClassData();
+            renderModalClassList();
+            showToast(`Klasse "${rawVal}" erstellt!`);
+        }
+
+        function renderModalClassList() {
+            activeClassLabelInModal.innerText = activeClassName;
+            studentTextarea.value = (classesData[activeClassName]?.students || []).join('\n');
+
+            const classKeys = Object.keys(classesData);
+            classListContainer.innerHTML = '';
+
+            classKeys.forEach((name) => {
+                const isActive = name === activeClassName;
+                const isRenaming = renamingTargetClass === name;
+                const studentCount = (classesData[name].students || []).length;
+
+                const row = document.createElement('div');
+                row.className = `p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all ${
+                    isActive 
+                        ? 'bg-indigo-50/70 border-indigo-200' 
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                }`;
+
+                if (isRenaming) {
+                    const inputField = document.createElement('input');
+                    inputField.type = 'text';
+                    inputField.value = name;
+                    inputField.className = 'w-full bg-white border border-indigo-300 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500';
+
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'flex items-center gap-1.5 shrink-0';
+
+                    const saveBtn = document.createElement('button');
+                    saveBtn.className = 'px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs';
+                    saveBtn.innerText = 'Speichern';
+
+                    const cancelBtn = document.createElement('button');
+                    cancelBtn.className = 'px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold';
+                    cancelBtn.innerText = 'Abbrechen';
+
+                    saveBtn.addEventListener('click', () => {
+                        confirmRenameClass(name, inputField.value.trim());
+                    });
+
+                    cancelBtn.addEventListener('click', () => {
+                        renamingTargetClass = null;
+                        renderModalClassList();
+                    });
+
+                    inputField.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            confirmRenameClass(name, inputField.value.trim());
+                        } else if (e.key === 'Escape') {
+                            renamingTargetClass = null;
+                            renderModalClassList();
+                        }
+                    });
+
+                    const fieldContainer = document.createElement('div');
+                    fieldContainer.className = 'flex-1 flex items-center gap-2';
+                    fieldContainer.appendChild(inputField);
+
+                    actionsDiv.appendChild(saveBtn);
+                    actionsDiv.appendChild(cancelBtn);
+
+                    row.appendChild(fieldContainer);
+                    row.appendChild(actionsDiv);
+
+                    setTimeout(() => {
+                        inputField.focus();
+                        inputField.select();
+                    }, 50);
+
+                } else {
+                    const leftCol = document.createElement('div');
+                    leftCol.className = 'flex items-center gap-2.5 min-w-0';
+                    leftCol.innerHTML = `
+                        <span class="w-2.5 h-2.5 rounded-full shrink-0 ${isActive ? 'bg-indigo-600' : 'bg-slate-300'}"></span>
+                        <div class="truncate">
+                            <span class="font-bold text-xs text-slate-900">${escapeHtmlText(name)}</span>
+                            <span class="text-xs text-slate-400 ml-1.5">(${studentCount} SuS)</span>
+                        </div>
+                    `;
+
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'flex items-center gap-1.5 shrink-0';
+
+                    if (!isActive) {
+                        const selectBtn = document.createElement('button');
+                        selectBtn.className = 'px-2.5 py-1 bg-white hover:bg-slate-100 text-indigo-700 border border-slate-200 rounded-lg text-xs font-semibold transition-all';
+                        selectBtn.innerText = 'Auswählen';
+                        selectBtn.addEventListener('click', () => {
+                            activeClassName = name;
+                            localStorage.setItem('sek_active_class', activeClassName);
+                            loadCurrentClassData();
+                            renderModalClassList();
+                            showToast(`Klasse gewechselt: ${name}`);
+                        });
+                        actionsDiv.appendChild(selectBtn);
+                    } else {
+                        const activeBadge = document.createElement('span');
+                        activeBadge.className = 'px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-md text-[11px] font-bold';
+                        activeBadge.innerText = 'Aktiv';
+                        actionsDiv.appendChild(activeBadge);
+                    }
+
+                    const renameBtn = document.createElement('button');
+                    renameBtn.className = 'px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-all';
+                    renameBtn.innerText = 'Umbenennen';
+                    renameBtn.addEventListener('click', () => {
+                        renamingTargetClass = name;
+                        renderModalClassList();
+                    });
+                    actionsDiv.appendChild(renameBtn);
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.innerText = 'Löschen';
+                    if (classKeys.length <= 1) {
+                        deleteBtn.className = 'px-2 py-1 opacity-40 cursor-not-allowed bg-slate-100 text-slate-400 rounded-lg text-xs font-semibold transition-all';
+                        deleteBtn.disabled = true;
+                    } else {
+                        deleteBtn.className = 'px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg text-xs font-semibold transition-all';
+                        deleteBtn.addEventListener('click', () => {
+                            handleDeleteClass(name);
+                        });
+                    }
+                    actionsDiv.appendChild(deleteBtn);
+
+                    row.appendChild(leftCol);
+                    row.appendChild(actionsDiv);
+                }
+
+                classListContainer.appendChild(row);
+            });
+
+            lucide.createIcons();
+        }
+
+        function confirmRenameClass(oldName, newName) {
+            if (!newName) {
+                showToast("Name darf nicht leer sein!");
+                return;
+            }
+            if (newName === oldName) {
+                renamingTargetClass = null;
+                renderModalClassList();
+                return;
+            }
+            if (classesData[newName]) {
+                showToast("Dieser Name existiert bereits!");
+                return;
+            }
+
+            classesData[newName] = classesData[oldName];
+            delete classesData[oldName];
+
+            if (activeClassName === oldName) {
+                activeClassName = newName;
+            }
+
+            renamingTargetClass = null;
+            saveAllClassesToStorage();
+            loadCurrentClassData();
+            renderModalClassList();
+            showToast(`Klasse umbenannt in "${newName}"`);
+        }
+
+        function handleDeleteClass(nameToDelete) {
+            const classKeys = Object.keys(classesData);
+            if (classKeys.length <= 1) return;
+
+            delete classesData[nameToDelete];
+            if (activeClassName === nameToDelete) {
+                activeClassName = Object.keys(classesData)[0];
+            }
+
+            saveAllClassesToStorage();
+            loadCurrentClassData();
+            renderModalClassList();
+            showToast(`Klasse "${nameToDelete}" gelöscht.`);
+        }
+
+        function escapeHtmlText(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+
+        function syncClassDropdowns() {
+            const classNames = Object.keys(classesData);
+            const optionsHtml = classNames.map(name => 
+                `<option value="${name}" ${name === activeClassName ? 'selected' : ''}>${name}</option>`
+            ).join('');
+
+            classSelector.innerHTML = optionsHtml;
+            classStudentCount.innerText = `${(classesData[activeClassName]?.students || []).length} SuS`;
+            updateAttendanceBadge();
+        }
+
+        function updateAttendanceBadge() {
+            const total = initialStudents.length;
+            const present = getPresentStudents().length;
+            attendanceHeaderBadge.innerText = `${present} / ${total} anwesend`;
+            if (present === total) {
+                attendanceHeaderBadge.className = "text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200";
+            } else {
+                attendanceHeaderBadge.className = "text-xs font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200";
+            }
+        }
+
+        function onClassChange(newClassName) {
+            activeClassName = newClassName;
+            localStorage.setItem('sek_active_class', activeClassName);
+            loadCurrentClassData();
+            showToast(`Klasse gewechselt: ${newClassName}`);
+        }
+
+        function loadCurrentClassData() {
+            initialStudents = [...(classesData[activeClassName]?.students || [])];
+            savedGroupSets = classesData[activeClassName]?.savedGroups || {};
+            absentStudents = new Set(classesData[activeClassName]?.absent || []);
+            syncClassDropdowns();
+            resetRounds();
+            renderSavedGroupsBar();
+            renderAttendanceGrid();
+            if (!groupsSection.classList.contains('hidden')) {
+                generateRandomGroups();
+            }
+        }
+
+        function saveAllClassesToStorage() {
+            if (classesData[activeClassName]) {
+                classesData[activeClassName].absent = Array.from(absentStudents);
+            }
+            localStorage.setItem('sek_classes_data', JSON.stringify(classesData));
+            localStorage.setItem('sek_active_class', activeClassName);
+            pushDataToCloud();
+        }
+
+        // ==========================================
+        // ANWESENHEIT
+        // ==========================================
+        function toggleStudentAttendance(name) {
+            if (absentStudents.has(name)) {
+                absentStudents.delete(name);
+            } else {
+                absentStudents.add(name);
+                remainingStudents = remainingStudents.filter(s => s !== name);
+            }
+            saveAllClassesToStorage();
+            updateAttendanceBadge();
+            renderAttendanceGrid();
+            updateUI();
+        }
+
+        function setAllAttendance(allPresent) {
+            if (allPresent) {
+                absentStudents.clear();
+            } else {
+                initialStudents.forEach(s => absentStudents.add(s));
+            }
+            saveAllClassesToStorage();
+            resetRounds();
+            updateAttendanceBadge();
+            renderAttendanceGrid();
+            showToast(allPresent ? "Alle als anwesend markiert" : "Alle als abwesend markiert");
+        }
+
+        function renderAttendanceGrid() {
+            attendanceGrid.innerHTML = initialStudents.map(name => {
+                const isAbsent = absentStudents.has(name);
+                return `
+                    <button onclick="toggleStudentAttendance('${name}')" class="p-3.5 rounded-2xl border transition-all flex items-center justify-between text-left ${
+                        isAbsent 
+                            ? 'bg-rose-50/70 border-rose-200 text-rose-900 opacity-80' 
+                            : 'bg-white border-slate-200 text-slate-800 hover:border-indigo-300 shadow-2xs'
+                    }">
+                        <div class="flex items-center gap-2.5 overflow-hidden">
+                            <span class="w-2.5 h-2.5 rounded-full shrink-0 ${isAbsent ? 'bg-rose-500' : 'bg-emerald-500'}"></span>
+                            <span class="font-semibold text-sm truncate ${isAbsent ? 'line-through text-rose-700' : ''}">${name}</span>
+                        </div>
+                        <span class="text-xs font-bold shrink-0 ml-2 px-2 py-0.5 rounded-md ${
+                            isAbsent 
+                                ? 'bg-rose-100 text-rose-800' 
+                                : 'bg-emerald-50 text-emerald-700'
+                        }">
+                            ${isAbsent ? 'Abwesend' : 'Anwesend'}
+                        </span>
+                    </button>
+                `;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        // ==========================================
+        // ANSICHTEN & ZIEHUNG
+        // ==========================================
+        function switchMainView(view) {
+            singleDrawSection.classList.add('hidden');
+            groupsSection.classList.add('hidden');
+            groupsSection.classList.remove('flex');
+            attendanceSection.classList.add('hidden');
+            attendanceSection.classList.remove('flex');
+
+            const inactiveBtnClass = "px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all duration-200";
+            const activeBtnClass = "px-3 py-1.5 rounded-lg transition-all duration-200 bg-white text-indigo-700 shadow-xs";
+
+            viewSingleBtn.className = inactiveBtnClass;
+            viewGroupsBtn.className = inactiveBtnClass;
+            viewAttendanceBtn.className = inactiveBtnClass + " flex items-center gap-1";
+
+            if (view === 'single') {
+                singleDrawSection.classList.remove('hidden');
+                viewSingleBtn.className = activeBtnClass;
+            } else if (view === 'groups') {
+                groupsSection.classList.remove('hidden');
+                groupsSection.classList.add('flex');
+                viewGroupsBtn.className = activeBtnClass;
+                if (currentGroups.length === 0) {
+                    generateRandomGroups();
+                }
+            } else if (view === 'attendance') {
+                attendanceSection.classList.remove('hidden');
+                attendanceSection.classList.add('flex');
+                viewAttendanceBtn.className = activeBtnClass + " flex items-center gap-1";
+                renderAttendanceGrid();
+            }
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            if (mode === 'unique') {
+                modeUniqueBtn.className = "px-2.5 py-1 rounded-md bg-white text-indigo-700 shadow-xs";
+                modeRepeatBtn.className = "px-2.5 py-1 rounded-md text-slate-600";
+                progressContainer.classList.remove('opacity-0');
+            } else {
+                modeRepeatBtn.className = "px-2.5 py-1 rounded-md bg-white text-indigo-700 shadow-xs";
+                modeUniqueBtn.className = "px-2.5 py-1 rounded-md text-slate-600";
+                progressContainer.classList.add('opacity-0');
+            }
+            updateUI();
+        }
+
+        function pickStudent() {
+            if (isAnimating) return;
+
+            const presentStudents = getPresentStudents();
+
+            if (presentStudents.length === 0) {
+                displayName.innerText = "Alle als abwesend markiert!";
+                displayName.classList.remove('text-indigo-600', 'text-slate-900');
+                displayName.classList.add('text-rose-600');
+                nameBadge.innerText = "Keine anwesenden SuS";
+                nameBadge.className = "text-xs uppercase tracking-widest font-bold text-rose-700 bg-rose-50 px-3 py-1 rounded-full border border-rose-200 mb-4 inline-block";
+                return;
+            }
+
+            let candidatePool = currentMode === 'unique' ? remainingStudents : presentStudents;
+
+            if (currentMode === 'unique' && candidatePool.length === 0) {
+                displayName.innerText = "Alle anwesenden SuS waren dran!";
+                displayName.classList.remove('text-indigo-600', 'text-slate-900');
+                displayName.classList.add('text-emerald-600');
+                nameBadge.innerText = "Durchgang beendet";
+                nameBadge.className = "text-xs uppercase tracking-widest font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 mb-4 inline-block";
+                return;
+            }
+
+            isAnimating = true;
+            drawBtn.disabled = true;
+            drawBtn.classList.add('opacity-75', 'cursor-not-allowed');
+
+            let counter = 0;
+            const shuffleInterval = 40;
+            const totalShuffleTime = 320;
+
+            const intervalId = setInterval(() => {
+                const randomSample = presentStudents[Math.floor(Math.random() * presentStudents.length)];
+                displayName.innerText = randomSample;
+                displayName.classList.remove('animate-pop');
+                counter += shuffleInterval;
+
+                if (counter >= totalShuffleTime) {
+                    clearInterval(intervalId);
+                    finalizeSelection(presentStudents);
+                }
+            }, shuffleInterval);
+        }
+
+        function finalizeSelection(presentStudents) {
+            let selectedName = "";
+
+            if (currentMode === 'unique') {
+                const randomIndex = Math.floor(Math.random() * remainingStudents.length);
+                selectedName = remainingStudents.splice(randomIndex, 1)[0];
+                pickedStudents.unshift(selectedName);
+            } else {
+                const randomIndex = Math.floor(Math.random() * presentStudents.length);
+                selectedName = presentStudents[randomIndex];
+                pickedStudents.unshift(selectedName);
+            }
+
+            displayName.innerText = selectedName;
+            displayName.classList.remove('text-emerald-600', 'text-rose-600');
+            displayName.classList.add('text-slate-900', 'animate-pop');
+
+            nameBadge.innerText = currentMode === 'unique' 
+                ? `Aufgerufen (${pickedStudents.length} von ${presentStudents.length} anwesend)` 
+                : "Ausgewählt";
+            nameBadge.className = "text-xs uppercase tracking-widest font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200 mb-4 inline-block";
+
+            isAnimating = false;
+            drawBtn.disabled = false;
+            drawBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+
+            saveAllClassesToStorage();
+            updateUI();
+        }
+
+        function updateUI() {
+            const presentStudents = getPresentStudents();
+
+            if (currentMode === 'unique') {
+                counterText.innerText = `${remainingStudents.length} von ${presentStudents.length} noch offen`;
+                const progressPercent = presentStudents.length > 0 
+                    ? ((presentStudents.length - remainingStudents.length) / presentStudents.length) * 100 
+                    : 0;
+                progressBar.style.width = `${progressPercent}%`;
+            } else {
+                counterText.innerText = `Anwesend: ${presentStudents.length} Schüler`;
+            }
+
+            pickedCount.innerText = pickedStudents.length;
+
+            if (pickedStudents.length === 0) {
+                historyChips.innerHTML = '<span class="text-xs text-slate-400 italic">Noch niemand aufgerufen</span>';
+            } else {
+                historyChips.innerHTML = pickedStudents.map((name, index) => {
+                    const isLatest = index === 0;
+                    return `
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold ${isLatest ? 'bg-indigo-600 text-white shadow-xs' : 'bg-slate-100 text-slate-700 border border-slate-200'}">
+                            ${name}
+                        </span>
+                    `;
+                }).join('');
+            }
+
+            updateAttendanceBadge();
+            lucide.createIcons();
+        }
+
+        function resetRounds() {
+            remainingStudents = [...getPresentStudents()];
+            pickedStudents = [];
+            displayName.innerText = "– Bereit –";
+            displayName.classList.remove('text-emerald-600', 'text-rose-600', 'animate-pop');
+            displayName.classList.add('text-slate-900');
+            nameBadge.innerText = "Neuer Durchgang";
+            nameBadge.className = "text-xs uppercase tracking-widest font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full border border-slate-200 mb-4 inline-block";
+            progressBar.style.width = '0%';
+            updateUI();
+        }
+
+        // ==========================================
+        // GRUPPEN
+        // ==========================================
+        function setGroupTarget(type, value, btnEl) {
+            groupTargetType = type;
+            groupTargetVal = value;
+
+            const container = document.getElementById('groupTargetButtons');
+            container.querySelectorAll('button').forEach(b => {
+                b.className = "px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900";
+            });
+            if (btnEl) {
+                btnEl.className = "px-3 py-1.5 rounded-lg bg-white text-indigo-700 shadow-xs";
+            }
+
+            generateRandomGroups();
+        }
+
+        function generateRandomGroups() {
+            const presentStudents = getPresentStudents();
+            if (presentStudents.length === 0) {
+                groupsGrid.innerHTML = `
+                    <div class="col-span-full p-8 text-center bg-white border border-slate-200 rounded-2xl text-slate-500 font-medium text-sm">
+                        Keine anwesenden Schülerinnen und Schüler vorhanden. Bitte im Tab «Anwesenheit» anpassen.
+                    </div>
+                `;
+                return;
+            }
+
+            let shuffled = [...presentStudents];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+
+            let numGroups = 5;
+            if (groupTargetType === 'count') {
+                numGroups = groupTargetVal;
+            } else {
+                numGroups = Math.max(1, Math.round(shuffled.length / groupTargetVal));
+            }
+
+            numGroups = Math.min(numGroups, shuffled.length);
+
+            let result = Array.from({ length: numGroups }, () => []);
+            shuffled.forEach((student, index) => {
+                result[index % numGroups].push(student);
+            });
+
+            currentGroups = result;
+            renderGroupsUI();
+        }
+
+        function renderGroupsUI() {
+            groupsGrid.innerHTML = currentGroups.map((group, idx) => `
+                <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                            <span class="font-extrabold text-indigo-700 text-sm tracking-wide">Gruppe ${idx + 1}</span>
+                            <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">${group.length} Personen</span>
+                        </div>
+                        <ul class="space-y-2">
+                            ${group.map(name => `
+                                <li class="text-sm font-medium text-slate-800 flex items-center gap-2">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                                    <span>${escapeHtmlText(name)}</span>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                </div>
+            `).join('');
+
+            lucide.createIcons();
+        }
+
+        function saveCurrentGroupsPrompt() {
+            if (currentGroups.length === 0) return;
+            const input = document.getElementById('saveGroupNameInput');
+            input.value = '';
+            document.getElementById('saveGroupModal').classList.remove('hidden');
+            setTimeout(() => input.focus(), 50);
+        }
+
+        function closeSaveGroupModal() {
+            document.getElementById('saveGroupModal').classList.add('hidden');
+        }
+
+        function confirmSaveGroup() {
+            const input = document.getElementById('saveGroupNameInput');
+            const name = input.value.trim();
+            if (!name) {
+                showToast("Bitte gib einen Gruppennamen ein!");
+                input.focus();
+                return;
+            }
+
+            savedGroupSets[name] = currentGroups;
+            classesData[activeClassName].savedGroups = savedGroupSets;
+            saveAllClassesToStorage();
+            renderSavedGroupsBar();
+            closeSaveGroupModal();
+            showToast(`Gruppe "${name}" für ${activeClassName} gespeichert!`);
+        }
+
+        document.getElementById('saveGroupNameInput')?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmSaveGroup();
+            } else if (e.key === 'Escape') {
+                closeSaveGroupModal();
+            }
+        });
+
+        function loadSavedGroups(name) {
+            if (savedGroupSets[name]) {
+                currentGroups = savedGroupSets[name];
+                renderGroupsUI();
+                showToast(`"${name}" geladen`);
+            }
+        }
+
+        function deleteSavedGroup(name, event) {
+            event.stopPropagation();
+            delete savedGroupSets[name];
+            classesData[activeClassName].savedGroups = savedGroupSets;
+            saveAllClassesToStorage();
+            renderSavedGroupsBar();
+            showToast(`"${name}" entfernt`);
+        }
+
+        function renderSavedGroupsBar() {
+            const keys = Object.keys(savedGroupSets);
+            if (keys.length === 0) {
+                savedGroupsList.innerHTML = '<span class="text-xs text-slate-400 italic">Noch keine Gruppen in dieser Klasse gespeichert</span>';
+                return;
+            }
+
+            savedGroupsList.innerHTML = keys.map(key => `
+                <div onclick="loadSavedGroups('${key}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white hover:bg-indigo-100/60 text-indigo-900 border border-indigo-200 rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-2xs">
+                    <span>${key}</span>
+                    <button onclick="deleteSavedGroup('${key}', event)" title="Löschen" class="text-slate-400 hover:text-rose-600 p-0.5">
+                        <i data-lucide="x" class="w-3 h-3"></i>
+                    </button>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        function copyGroupsToClipboard() {
+            if (currentGroups.length === 0) return;
+            let text = `Gruppeneinteilung – ${activeClassName} (${getPresentStudents().length} anwesend):\n\n`;
+            currentGroups.forEach((group, idx) => {
+                text += `Gruppe ${idx + 1}:\n` + group.map(m => `- ${m}`).join('\n') + "\n\n";
+            });
+
+            const dummy = document.createElement("textarea");
+            document.body.appendChild(dummy);
+            dummy.value = text;
+            dummy.select();
+            document.execCommand("copy");
+            document.body.removeChild(dummy);
+
+            showToast("Gruppen in Zwischenablage kopiert!");
+        }
+
+        // ==========================================
+        // KLASSENLISTE ANPASSEN MODAL
+        // ==========================================
+        function openSettingsModal() {
+            syncClassDropdowns();
+            renamingTargetClass = null;
+            newClassInput.value = "";
+            renderModalClassList();
+            settingsModal.classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            renamingTargetClass = null;
+            settingsModal.classList.add('hidden');
+        }
+
+        function saveStudentsFromModal() {
+            const lines = studentTextarea.value
+                .split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0);
+
+            if (lines.length === 0) {
+                showToast("Die Schülerliste darf nicht leer sein!");
+                return;
+            }
+
+            classesData[activeClassName].students = lines;
+            saveAllClassesToStorage();
+            loadCurrentClassData();
+            renderModalClassList();
+
+            showToast(`${lines.length} Namen für "${activeClassName}" gespeichert!`);
+            closeSettingsModal();
+        }
+
+        function resetDefaultStudents() {
+            if (defaultClassesInitial[activeClassName]) {
+                studentTextarea.value = defaultClassesInitial[activeClassName].students.join('\n');
+                showToast(`Standard-SuS für ${activeClassName} geladen (Klicke auf 'Namen speichern')`);
+            } else {
+                showToast("Für diese eigene Klasse gibt es keine Vorlage.");
+            }
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            toast.classList.remove('opacity-0');
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+            }, 2500);
+        }
+
+        // Tastatursteuerung (Leertaste löst Ziehung aus)
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && e.target === document.body && singleDrawSection && !singleDrawSection.classList.contains('hidden')) {
+                e.preventDefault();
+                pickStudent();
+            }
+        });
+    </script>
+</body>
+</html>
