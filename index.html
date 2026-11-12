@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zufallsgenerator & Gruppen-Tool – Sek A (ZH)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Firebase SDKs (Compat v10 für direkte HTML-Nutzung) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+        body { font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
+        .font-mono-num { font-family: 'JetBrains Mono', monospace; }
+        @keyframes popIn {
+            0% { transform: scale(0.92); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop { animation: popIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col antialiased selection:bg-indigo-100 selection:text-indigo-900">
+
+    <!-- Top Navigation Bar -->
+    <header class="w-full bg-white border-b border-slate-200 py-3 px-4 md:px-6 flex flex-wrap justify-between items-center gap-3 sticky top-0 z-30 shadow-2xs">
+        <div class="flex items-center gap-3">
+            <div class="bg-indigo-600 text-white p-2 rounded-xl shadow-xs flex items-center justify-center">
+                <i data-lucide="shuffle" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="text-base md:text-lg font-extrabold tracking-tight text-slate-900">Sek A Zufallsgenerator</h1>
+                    <span class="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                        <i data-lucide="shield-check" class="w-3 h-3 text-emerald-600"></i>
+                        Server Zürich (CH)
+                    </span>
+                </div>
+                <div class="flex items-center gap-2 mt-0.5 text-xs">
+                    <span id="syncDot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+                    <span id="syncStatusText" class="text-slate-500 font-medium">Lokal-Modus (ohne Login) – Klassen werden nicht dauerhaft gespeichert</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <!-- Zoom-Steuerung für Beamer / Tablet -->
+            <div class="hidden sm:flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 text-xs font-bold">
+                <button type="button" onclick="adjustZoom(-0.1)" class="px-2 py-1 rounded-lg hover:bg-white text-slate-600 transition-colors" title="Text verkleinern">A−</button>
+                <button type="button" onclick="resetZoom()" class="px-2 py-1 rounded-lg hover:bg-white text-slate-500 text-[11px]" title="Standardgrösse">100%</button>
+                <button type="button" onclick="adjustZoom(0.1)" class="px-2 py-1 rounded-lg hover:bg-white text-slate-600 transition-colors" title="Text vergrössern">A+</button>
+            </div>
+
+            <!-- Login / Konto Button -->
+            <button type="button" id="authHeaderBtn" onclick="openAuthModal()" class="flex items-center gap-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs">
+                <i data-lucide="log-in" class="w-3.5 h-3.5"></i>
+                <span id="authHeaderLabel">Login / Registrieren</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- ===================================================================== -->
+    <!-- HAUPT-APP (IMMER DIREKT NUTZBAR – OHNE LOGIN LEER / LOKAL)            -->
+    <!-- ===================================================================== -->
+    <main class="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 flex flex-col gap-5">
+
+        <!-- Dezentes Info-Banner im ausgeloggten Zustand -->
+        <div id="guestBanner" class="bg-indigo-50/80 border border-indigo-200 rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div class="flex items-center gap-2.5 text-indigo-950">
+                <i data-lucide="info" class="w-4 h-4 text-indigo-600 shrink-0"></i>
+                <span>
+                    <strong>Direktstart ohne Login:</strong> Sie können die App sofort nutzen. Für dauerhaft gespeicherte Klassen über mehrere Geräte (Server Zürich) bitte anmelden.
+                </span>
+            </div>
+            <button type="button" onclick="openAuthModal()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-2xs transition-colors shrink-0">
+                Meine Klassen laden (Login)
+            </button>
+        </div>
+
+        <!-- Klassen-Auswahl & Verwaltung -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+            <div class="flex items-center flex-wrap gap-2" id="classTabsContainer">
+                <!-- Klassen-Tabs werden dynamisch gerendert -->
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="openNewClassModal()" class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold transition-colors">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                    <span>Neue Klasse</span>
+                </button>
+                <button type="button" id="editClassBtn" onclick="openEditClassModal()" class="hidden flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition-colors">
+                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                    <span>Klasse bearbeiten</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Leerzustand (wenn keine Klassen vorhanden sind – Standard beim Start ohne Login) -->
+        <div id="emptyClassesState" class="bg-white border border-slate-200 rounded-3xl p-8 md:p-10 text-center flex flex-col items-center gap-4 shadow-2xs animate-pop">
+            <div class="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center">
+                <i data-lucide="users" class="w-7 h-7"></i>
+            </div>
+            <div class="space-y-1 max-w-md">
+                <h2 class="text-base md:text-lg font-extrabold text-slate-900">Noch keine Klasse aktiv</h2>
+                <p class="text-xs text-slate-500 leading-relaxed">
+                    Erstellen Sie direkt eine temporäre Klasse für diese Lektion oder melden Sie sich an, um Ihre gespeicherten Klassen vom Server Zürich abzurufen.
+                </p>
+            </div>
+
+            <div class="bg-emerald-50/80 border border-emerald-200 rounded-2xl px-4 py-3 text-[11px] text-emerald-950 max-w-md text-left flex items-start gap-2">
+                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-700 shrink-0 mt-0.5"></i>
+                <span><strong>Datenschutz (IDG ZH):</strong> Bitte erfassen Sie ausschliesslich <strong>Vornamen</strong> (bei Namensgleichheit z. B. <em>«Mia S.»</em>).</span>
+            </div>
+
+            <div class="flex flex-wrap justify-center gap-2.5 pt-1">
+                <button type="button" onclick="openNewClassModal()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Klasse erfassen &amp; direkt starten</span>
+                </button>
+                <button type="button" id="emptyLoginBtn" onclick="openAuthModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                    <i data-lucide="log-in" class="w-4 h-4"></i>
+                    <span>Anmelden / Registrieren</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Arbeitsbereich (sobald mindestens eine Klasse erstellt oder per Login geladen wurde) -->
+        <div id="workspaceGrid" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+            <!-- Linke Spalte (5 Cols): Anwesenheit / Schülerinnen & Schüler -->
+            <div class="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-4 flex flex-col gap-3 shadow-2xs">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <div>
+                        <h2 id="activeClassTitle" class="text-sm font-extrabold text-slate-900">Klasse</h2>
+                        <p id="attendanceCounter" class="text-xs text-slate-500 font-medium">0 von 0 anwesend</p>
+                    </div>
+                    <div class="flex gap-1.5">
+                        <button type="button" onclick="setAllPresent(true)" class="px-2 py-1 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg">Alle da</button>
+                        <button type="button" onclick="resetDrawnHistory()" class="px-2 py-1 text-[11px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg" title="Runde zurücksetzen">Runde neu</button>
+                    </div>
+                </div>
+
+                <div id="studentsChecklist" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-1.5 max-h-[460px] overflow-y-auto pr-1">
+                    <!-- SuS-Chips -->
+                </div>
+            </div>
+
+            <!-- Rechte Spalte (7 Cols): Zufallsziehung & Gruppen-Generator -->
+            <div class="lg:col-span-7 flex flex-col gap-5">
+
+                <!-- Karte 1: Einzelperson ziehen -->
+                <div class="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col gap-4 shadow-2xs">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <span class="text-xs font-extrabold uppercase tracking-wider text-indigo-600 flex items-center gap-1.5">
+                            <i data-lucide="sparkles" class="w-4 h-4"></i>
+                            <span>Zufällige Auswahl</span>
+                        </span>
+                        <label class="flex items-center gap-1.5 text-xs font-semibold text-slate-600 cursor-pointer">
+                            <input type="checkbox" id="noRepeatCheck" checked class="rounded text-indigo-600">
+                            <span>Ohne Wiederholung bis alle dran waren</span>
+                        </label>
+                    </div>
+
+                    <div id="pickedResultBox" class="min-h-[104px] rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-col items-center justify-center p-4 text-center">
+                        <span class="text-xs text-slate-400 font-medium">Bereit für die nächste Ziehung</span>
+                    </div>
+
+                    <button type="button" onclick="pickRandomStudent()" class="w-full py-3 px-5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white rounded-xl text-sm font-extrabold shadow-xs transition-all flex items-center justify-center gap-2">
+                        <i data-lucide="dices" class="w-4 h-4"></i>
+                        <span>Nächste Person ziehen</span>
+                    </button>
+                </div>
+
+                <!-- Karte 2: Gruppen-Generator (mit Restanten-Schutz ohne Einzelpersonen) -->
+                <div class="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col gap-4 shadow-2xs">
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                        <span class="text-xs font-extrabold uppercase tracking-wider text-emerald-700 flex items-center gap-1.5">
+                            <i data-lucide="layout-grid" class="w-4 h-4"></i>
+                            <span>Gruppen bilden (ohne Einzelpersonen)</span>
+                        </span>
+
+                        <div class="flex items-center gap-2 text-xs">
+                            <select id="groupModeSelect" class="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-bold text-slate-700">
+                                <option value="maxSize">Max. Teamgrösse</option>
+                                <option value="numGroups">Anzahl Gruppen</option>
+                            </select>
+                            <input type="number" id="groupNumberInput" value="3" min="2" max="12" class="w-16 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-mono-num font-bold text-center text-slate-800">
+                            <button type="button" onclick="generateGroups()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-2xs transition-colors">
+                                Mischen
+                            </button>
+                        </div>
+                    </div>
+
+                    <p class="text-[11px] text-slate-500">
+                        Tipp: Klicken Sie in den fertigen Gruppen auf zwei Namen nacheinander, um sie direkt zu tauschen (Swap).
+                    </p>
+
+                    <div id="groupsResultGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        <div class="col-span-full py-6 text-center text-xs text-slate-400 italic">
+                            Wählen Sie Teamgrösse oder Gruppenanzahl und klicken Sie auf «Mischen».
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL: LOGIN & REGISTRIERUNG (MULTI-USER + DATENSCHUTZ ZÜRICH)        -->
+    <!-- ===================================================================== -->
+    <div id="authModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 flex flex-col gap-4 animate-pop">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="cloud" class="w-5 h-5 text-indigo-600"></i>
+                    <h3 class="text-base font-extrabold text-slate-900">Lehrpersonen-Konto (Sync Zürich)</h3>
+                </div>
+                <button type="button" onclick="closeAuthModal()" class="text-slate-400 hover:text-slate-700 p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Wenn bereits eingeloggt: Konto-Info & Logout -->
+            <div id="authLoggedInPanel" class="hidden flex flex-col gap-3">
+                <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-xs text-emerald-950 space-y-1">
+                    <div class="font-extrabold flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        <span>Angemeldet &amp; synchronisiert</span>
+                    </div>
+                    <p id="loggedInEmailDisplay" class="font-mono-num text-[11px] text-emerald-800"></p>
+                    <p class="text-[11px] text-emerald-700 pt-1">Speicherort: Google Cloud Zürich (europe-west6)</p>
+                </div>
+                <button type="button" onclick="logoutUser()" class="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-colors">
+                    Abmelden (Klassen ausblenden)
+                </button>
+            </div>
+
+            <!-- Wenn ausgeloggt: Login & Registrierung -->
+            <div id="authFormPanel" class="flex flex-col gap-3.5">
+                <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-950 leading-relaxed">
+                    <strong>Datenschutz-Regel (IDG Kanton Zürich):</strong><br>
+                    Datenablage erfolgt auf Servern in <strong>Zürich</strong>. Bitte erfassen Sie in Ihren Klassenlisten <strong>ausschliesslich Vornamen</strong> (keine Nachnamen, keine Noten).
+                </div>
+
+                <div id="authErrorBox" class="hidden bg-rose-50 border border-rose-200 text-rose-700 rounded-xl p-3 text-xs font-semibold"></div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">E-Mail-Adresse</label>
+                    <input type="email" id="authEmailInput" placeholder="name@schule.ch" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Passwort (mind. 6 Zeichen)</label>
+                    <input type="password" id="authPasswordInput" placeholder="••••••••" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <label class="flex items-start gap-2 text-[11px] text-slate-600 cursor-pointer pt-0.5">
+                    <input type="checkbox" id="privacyAcceptCheck" checked class="mt-0.5 rounded text-indigo-600">
+                    <span>Ich bestätige, dass ich nur Vornamen ohne schützenswerte Personendaten erfasse.</span>
+                </label>
+
+                <div class="grid grid-cols-2 gap-2.5 pt-1">
+                    <button type="button" onclick="loginWithEmail()" class="py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors">
+                        Anmelden
+                    </button>
+                    <button type="button" onclick="registerWithEmail()" class="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 rounded-xl text-xs font-bold transition-colors">
+                        Neu registrieren
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL: NEUE KLASSE / KLASSE BEARBEITEN (MIT VORNAMEN-SCHUTZ)          -->
+    <!-- ===================================================================== -->
+    <div id="classEditorModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 flex flex-col gap-4 animate-pop">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 id="classModalTitle" class="text-base font-extrabold text-slate-900">Neue Klasse erfassen</h3>
+                <button type="button" onclick="closeClassEditorModal()" class="text-slate-400 hover:text-slate-700 p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-[11px] text-emerald-950 flex items-start gap-2">
+                <i data-lucide="shield-alert" class="w-4 h-4 text-emerald-700 shrink-0 mt-0.5"></i>
+                <span><strong>Nur Vornamen verwenden:</strong> Bitte geben Sie pro Zeile nur einen Vornamen ein (bei gleichen Vornamen z. B. <em>«Luca M.»</em>). Serverstandort: Zürich.</span>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Klassenbezeichnung</label>
+                <input type="text" id="classNameInput" placeholder="z. B. 2Ac oder 1Ba" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+
+            <div>
+                <div class="flex items-center justify-between mb-1">
+                    <label class="text-xs font-bold text-slate-700">Vornamen (ein Name pro Zeile oder kommagetrennt)</label>
+                    <span id="nameCountPreview" class="text-[11px] font-mono-num font-bold text-indigo-600">0 SuS</span>
+                </div>
+                <textarea id="classNamesTextarea" oninput="validateNamesInput()" rows="7" placeholder="Anna&#10;Ben&#10;Carla&#10;Dario..." class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 leading-relaxed"></textarea>
+                <p id="fullNameWarning" class="hidden text-[11px] font-semibold text-amber-700 mt-1">
+                    Hinweis: Mindestens eine Zeile enthält zwei ausgeschriebene Wörter. Bitte kürzen Sie Nachnamen aus Datenschutzgründen auf den Anfangsbuchstaben ab (z. B. «Mia K.»).
+                </p>
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                <button type="button" id="deleteClassBtn" onclick="deleteEditingClass()" class="hidden text-xs font-bold text-rose-600 hover:underline">
+                    Klasse löschen
+                </button>
+                <div class="flex gap-2 ml-auto">
+                    <button type="button" onclick="closeClassEditorModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl">Abbrechen</button>
+                    <button type="button" onclick="saveClassFromModal()" class="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs">Speichern</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg transition-opacity duration-300 opacity-0 pointer-events-none z-50 flex items-center gap-2">
+        <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+        <span id="toastMsg">Gespeichert!</span>
+    </div>
+
+    <script>
+        function refreshIcons() {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                try { window.lucide.createIcons(); } catch (e) {}
+            }
+        }
+
+        // =========================================================================
+        // FIREBASE KONFIGURATION (HIER DEINE WERTE AUS DEM ALTEN CODE EINSETZEN)
+        // =========================================================================
+        const firebaseConfig = {
+            apiKey: "DEIN_API_KEY_HIER_EINFUEGEN",
+            authDomain: "zufallsgenerator-209f3.firebaseapp.com",
+            projectId: "zufallsgenerator-209f3",
+            storageBucket: "zufallsgenerator-209f3.appspot.com",
+            messagingSenderId: "DEINE_SENDER_ID",
+            appId: "DEINE_APP_ID"
+        };
+
+        let auth = null;
+        let db = null;
+        try {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            auth = firebase.auth();
+            db = firebase.firestore();
+        } catch (e) {
+            console.error("Firebase Init Fehler:", e);
+        }
+
+        // Fallback-Migration deiner Klassen (falls unter sekSync noch nichts liegt)
+        const legacyOwnerDefaultClasses = [
+            {
+                id: "cls-2ac",
+                name: "2Ac",
+                students: ["Alina", "Andrin", "Céline", "Dario", "Elena", "Fabio", "Gian", "Jana", "Jonas", "Kian", "Lara", "Leon", "Lia", "Lina", "Luca", "Lyan", "Mara", "Matteo", "Mia", "Nevio", "Nina", "Noel", "Sara"].map((n, i) => ({
+                    id: `2ac-${i}`, name: n, present: true, drawn: false
+                }))
+            },
+            {
+                id: "cls-2aa",
+                name: "2Aa",
+                students: ["Amina", "Ben", "Chiara", "David", "Elia", "Emma", "Finn", "Hannah", "Jan", "Julia", "Levin", "Livia", "Lukas", "Maja", "Nico", "Nora", "Ramon", "Selina", "Tim", "Zoe"].map((n, i) => ({
+                    id: `2aa-${i}`, name: n, present: true, drawn: false
+                }))
+            }
+        ];
+
+        // Startzustand: App ist sichtbar, aber classesData ist komplett leer
+        let currentUser = null;
+        let classesData = [];
+        let activeClassId = null;
+        let editingClassId = null;
+        let unsubscribeSnapshot = null;
+        let currentZoom = 1.0;
+        let swapSelection = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            renderAppContent();
+            refreshIcons();
+
+            if (auth) {
+                auth.onAuthStateChanged(async (user) => {
+                    if (user) {
+                        currentUser = user;
+                        setLoggedInUI(user);
+                        await connectUserFirestore(user);
+                    } else {
+                        currentUser = null;
+                        classesData = [];
+                        activeClassId = null;
+                        if (unsubscribeSnapshot) {
+                            unsubscribeSnapshot();
+                            unsubscribeSnapshot = null;
+                        }
+                        setLoggedOutUI();
+                        renderAppContent();
+                    }
+                });
+            }
+        });
+
+        // =========================================================================
+        // STATUS-ANZEIGE (LOKAL/LEER VS. ANGEMELDET)
+        // =========================================================================
+        function setLoggedOutUI() {
+            document.getElementById('guestBanner').classList.remove('hidden');
+            document.getElementById('emptyLoginBtn').classList.remove('hidden');
+
+            document.getElementById('syncDot').className = "w-2 h-2 rounded-full bg-amber-400";
+            document.getElementById('syncStatusText').innerText = "Lokal-Modus (ohne Login) – Klassen werden nicht dauerhaft gespeichert";
+            document.getElementById('authHeaderLabel').innerText = "Login / Registrieren";
+
+            document.getElementById('authLoggedInPanel').classList.add('hidden');
+            document.getElementById('authFormPanel').classList.remove('hidden');
+            refreshIcons();
+        }
+
+        function setLoggedInUI(user) {
+            document.getElementById('guestBanner').classList.add('hidden');
+            document.getElementById('emptyLoginBtn').classList.add('hidden');
+
+            document.getElementById('syncDot').className = "w-2 h-2 rounded-full bg-emerald-500";
+            document.getElementById('syncStatusText').innerText = `Sync aktiv (Zürich) • ${user.email}`;
+            document.getElementById('authHeaderLabel').innerText = "Konto";
+
+            document.getElementById('authLoggedInPanel').classList.remove('hidden');
+            document.getElementById('authFormPanel').classList.add('hidden');
+            document.getElementById('loggedInEmailDisplay').innerText = user.email;
+            refreshIcons();
+        }
+
+        function openAuthModal() {
+            document.getElementById('authErrorBox').classList.add('hidden');
+            document.getElementById('authModal').classList.remove('hidden');
+            refreshIcons();
+        }
+        function closeAuthModal() {
+            document.getElementById('authModal').classList.add('hidden');
+        }
+
+        async function loginWithEmail() {
+            const email = document.getElementById('authEmailInput').value.trim();
+            const pass = document.getElementById('authPasswordInput').value;
+            const errBox = document.getElementById('authErrorBox');
+            errBox.classList.add('hidden');
+
+            if (!email || !pass) {
+                errBox.innerText = "Bitte E-Mail und Passwort eingeben.";
+                errBox.classList.remove('hidden');
+                return;
+            }
+            try {
+                await auth.signInWithEmailAndPassword(email, pass);
+                closeAuthModal();
+                showToast("Erfolgreich angemeldet – lade deine Klassen...");
+            } catch (err) {
+                errBox.innerText = "Anmeldung fehlgeschlagen: " + err.message;
+                errBox.classList.remove('hidden');
+            }
+        }
+
+        async function registerWithEmail() {
+            const email = document.getElementById('authEmailInput').value.trim();
+            const pass = document.getElementById('authPasswordInput').value;
+            const accepted = document.getElementById('privacyAcceptCheck').checked;
+            const errBox = document.getElementById('authErrorBox');
+            errBox.classList.add('hidden');
+
+            if (!accepted) {
+                errBox.innerText = "Bitte bestätigen Sie den Datenschutzhinweis (nur Vornamen verwenden).";
+                errBox.classList.remove('hidden');
+                return;
+            }
+            if (!email || pass.length < 6) {
+                errBox.innerText = "Bitte gültige E-Mail und ein Passwort mit mind. 6 Zeichen eingeben.";
+                errBox.classList.remove('hidden');
+                return;
+            }
+            try {
+                // Falls im Lokal-Modus bereits eine Klasse getippt wurde, wird sie beim Registrieren gleich ins neue Konto übernommen!
+                const localDraftClasses = [...classesData];
+                const cred = await auth.createUserWithEmailAndPassword(email, pass);
+                if (localDraftClasses.length > 0 && db) {
+                    await db.collection('users').doc(cred.user.uid).collection('data').doc('appState').set({
+                        classes: localDraftClasses,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+                closeAuthModal();
+                showToast("Konto erstellt! Klassen werden auf Server Zürich gespeichert.");
+            } catch (err) {
+                errBox.innerText = "Registrierung fehlgeschlagen: " + err.message;
+                errBox.classList.remove('hidden');
+            }
+        }
+
+        async function logoutUser() {
+            if (auth) {
+                await auth.signOut();
+                closeAuthModal();
+                showToast("Abgemeldet – gespeicherte Klassen ausgeblendet.");
+            }
+        }
+
+        // =========================================================================
+        // FIRESTORE SYNC PRO NUTZERKONTO (users/{uid}/data/appState)
+        // =========================================================================
+        async function connectUserFirestore(user) {
+            if (!db) return;
+            const userDocRef = db.collection('users').doc(user.uid).collection('data').doc('appState');
+
+            try {
+                const snap = await userDocRef.get();
+                if (!snap.exists) {
+                    let initialClasses = [];
+
+                    // Übernahme bestehender Klassen aus dem bisherigen sekSync-Speicher (falls vorhanden)
+                    const legacySnap = await db.collection('sekSync').doc('default').get().catch(() => null);
+                    if (legacySnap && legacySnap.exists && Array.isArray(legacySnap.data().classes) && legacySnap.data().classes.length > 0) {
+                        initialClasses = legacySnap.data().classes;
+                    } else if (user.email && user.email.toLowerCase() === 'patrick.krapf63@gmail.com') {
+                        initialClasses = legacyOwnerDefaultClasses;
+                    }
+
+                    await userDocRef.set({
+                        classes: initialClasses,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+            } catch (e) {
+                console.warn("Initial-Check Firestore:", e);
+            }
+
+            unsubscribeSnapshot = userDocRef.onSnapshot((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    classesData = Array.isArray(data.classes) ? data.classes : [];
+                    if (classesData.length > 0 && !classesData.some(c => c.id === activeClassId)) {
+                        activeClassId = classesData[0].id;
+                    } else if (classesData.length === 0) {
+                        activeClassId = null;
+                    }
+                    renderAppContent();
+                }
+            }, (err) => {
+                console.error("Firestore Sync Fehler:", err);
+                showToast("Sync-Hinweis: Bitte Firestore-Regeln prüfen.");
+            });
+        }
+
+        async function saveClassesToCloud() {
+            if (!db || !currentUser) return;
+            const userDocRef = db.collection('users').doc(currentUser.uid).collection('data').doc('appState');
+            try {
+                await userDocRef.set({
+                    classes: classesData,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            } catch (e) {
+                showToast("Fehler beim Speichern in der Cloud: " + e.message);
+            }
+        }
+
+        // =========================================================================
+        // KLASSEN- & SCHÜLERVERWALTUNG (FUNKTIONIERT LOKAL UND MIT LOGIN)
+        // =========================================================================
+        function renderAppContent() {
+            const tabs = document.getElementById('classTabsContainer');
+            const emptyState = document.getElementById('emptyClassesState');
+            const workspace = document.getElementById('workspaceGrid');
+            const editBtn = document.getElementById('editClassBtn');
+
+            tabs.innerHTML = '';
+
+            if (classesData.length === 0) {
+                emptyState.classList.remove('hidden');
+                workspace.classList.add('hidden');
+                editBtn.classList.add('hidden');
+                refreshIcons();
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            workspace.classList.remove('hidden');
+            editBtn.classList.remove('hidden');
+
+            classesData.forEach(cls => {
+                const isActive = cls.id === activeClassId;
+                const btn = document.createElement('button');
+                btn.type = "button";
+                btn.onclick = () => {
+                    activeClassId = cls.id;
+                    swapSelection = null;
+                    renderAppContent();
+                };
+                btn.className = isActive
+                    ? "px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-indigo-600 text-white shadow-2xs transition-all"
+                    : "px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all";
+                btn.innerText = `${cls.name} (${cls.students.length})`;
+                tabs.appendChild(btn);
+            });
+
+            const activeCls = classesData.find(c => c.id === activeClassId);
+            if (!activeCls) return;
+
+            document.getElementById('activeClassTitle').innerText = `Klasse ${activeCls.name}`;
+            const presentCount = activeCls.students.filter(s => s.present).length;
+            document.getElementById('attendanceCounter').innerText = `${presentCount} von ${activeCls.students.length} anwesend`;
+
+            const list = document.getElementById('studentsChecklist');
+            list.innerHTML = '';
+
+            activeCls.students.forEach(st => {
+                const chip = document.createElement('button');
+                chip.type = "button";
+                chip.onclick = () => toggleStudentPresence(st.id);
+
+                let style = "bg-white border-slate-200 text-slate-800 hover:border-indigo-300";
+                if (!st.present) {
+                    style = "bg-rose-50/70 border-rose-200 text-rose-400 line-through opacity-75";
+                } else if (st.drawn) {
+                    style = "bg-emerald-50/70 border-emerald-200 text-emerald-800";
+                }
+
+                chip.className = `${style} border rounded-xl px-3 py-2 text-left text-xs font-bold flex items-center justify-between transition-all`;
+                chip.innerHTML = `
+                    <span class="truncate">${escapeHtml(st.name)}</span>
+                    ${!st.present
+                        ? `<span class="text-[10px] font-semibold text-rose-500">abw.</span>`
+                        : (st.drawn ? `<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>` : '')}
+                `;
+                list.appendChild(chip);
+            });
+
+            refreshIcons();
+        }
+
+        function toggleStudentPresence(studentId) {
+            const cls = classesData.find(c => c.id === activeClassId);
+            if (!cls) return;
+            const st = cls.students.find(s => s.id === studentId);
+            if (st) {
+                st.present = !st.present;
+                renderAppContent();
+                saveClassesToCloud();
+            }
+        }
+
+        function setAllPresent(val) {
+            const cls = classesData.find(c => c.id === activeClassId);
+            if (!cls) return;
+            cls.students.forEach(s => s.present = val);
+            renderAppContent();
+            saveClassesToCloud();
+        }
+
+        function resetDrawnHistory() {
+            const cls = classesData.find(c => c.id === activeClassId);
+            if (!cls) return;
+            cls.students.forEach(s => s.drawn = false);
+            document.getElementById('pickedResultBox').innerHTML = `<span class="text-xs text-slate-400 font-medium">Runde zurückgesetzt – alle wieder im Topf</span>`;
+            renderAppContent();
+            saveClassesToCloud();
+        }
+
+        // =========================================================================
+        // KLASSEN-EDITOR (NEU / BEARBEITEN / LÖSCHEN)
+        // =========================================================================
+        function openNewClassModal() {
+            editingClassId = null;
+            document.getElementById('classModalTitle').innerText = "Neue Klasse erfassen";
+            document.getElementById('classNameInput').value = "";
+            document.getElementById('classNamesTextarea').value = "";
+            document.getElementById('deleteClassBtn').classList.add('hidden');
+            validateNamesInput();
+            document.getElementById('classEditorModal').classList.remove('hidden');
+            refreshIcons();
+        }
+
+        function openEditClassModal() {
+            const cls = classesData.find(c => c.id === activeClassId);
+            if (!cls) return;
+            editingClassId = cls.id;
+            document.getElementById('classModalTitle').innerText = `Klasse ${cls.name} bearbeiten`;
+            document.getElementById('classNameInput').value = cls.name;
+            document.getElementById('classNamesTextarea').value = cls.students.map(s => s.name).join('\n');
+            document.getElementById('deleteClassBtn').classList.remove('hidden');
+            validateNamesInput();
+            document.getElementById('classEditorModal').classList.remove('hidden');
+            refreshIcons();
+        }
+
+        function closeClassEditorModal() {
+            document.getElementById('classEditorModal').classList.add('hidden');
+        }
+
+        function parseRawNames(raw) {
+            return raw.split(/[\n,;]+/).map(n => n.trim()).filter(n => n.length > 0);
+        }
+
+        function validateNamesInput() {
+            const names = parseRawNames(document.getElementById('classNamesTextarea').value);
+            document.getElementById('nameCountPreview').innerText = `${names.length} SuS`;
+
+            const hasFullLastName = names.some(n => /^[A-ZÄÖÜ][a-zäöüß]+\s+[A-ZÄÖÜ][a-zäöüß]{2,}$/.test(n));
+            const warnEl = document.getElementById('fullNameWarning');
+            if (hasFullLastName) {
+                warnEl.classList.remove('hidden');
+            } else {
+                warnEl.classList.add('hidden');
+            }
+        }
+
+        async function saveClassFromModal() {
+            const nameVal = document.getElementById('classNameInput').value.trim();
+            const parsedNames = parseRawNames(document.getElementById('classNamesTextarea').value);
+
+            if (!nameVal) {
+                showToast("Bitte Klassenname eingeben (z. B. 2Ac).");
+                return;
+            }
+            if (parsedNames.length === 0) {
+                showToast("Bitte mindestens einen Vornamen eingeben.");
+                return;
+            }
+
+            if (editingClassId) {
+                const cls = classesData.find(c => c.id === editingClassId);
+                if (cls) {
+                    cls.name = nameVal;
+                    const oldMap = new Map(cls.students.map(s => [s.name, s]));
+                    cls.students = parsedNames.map((n, idx) => {
+                        const existing = oldMap.get(n);
+                        return existing ? existing : { id: `${cls.id}-${idx}-${Date.now()}`, name: n, present: true, drawn: false };
+                    });
+                }
+            } else {
+                const newId = `cls-${Date.now()}`;
+                classesData.push({
+                    id: newId,
+                    name: nameVal,
+                    students: parsedNames.map((n, idx) => ({
+                        id: `${newId}-${idx}`, name: n, present: true, drawn: false
+                    }))
+                });
+                activeClassId = newId;
+            }
+
+            closeClassEditorModal();
+            renderAppContent();
+            await saveClassesToCloud();
+            showToast(currentUser ? `Klasse ${nameVal} in Cloud gespeichert!` : `Klasse ${nameVal} lokal erstellt (für dauerhaftes Speichern bitte einloggen).`);
+        }
+
+        async function deleteEditingClass() {
+            if (!editingClassId) return;
+            classesData = classesData.filter(c => c.id !== editingClassId);
+            activeClassId = classesData.length > 0 ? classesData[0].id : null;
+            closeClassEditorModal();
+            renderAppContent();
+            await saveClassesToCloud();
+            showToast("Klasse gelöscht.");
+        }
+
+        // =========================================================================
+        // ZUFALLSZIEHUNG & GRUPPEN-GENERATOR (MIT RESTANTEN-SCHUTZ & SWAP)
+        // =========================================================================
+        function pickRandomStudent() {
+            const cls = classesData.find(c => c.id === activeClassId);
+            if (!cls) return;
+
+            const noRepeat = document.getElementById('noRepeatCheck').checked;
+            let pool = cls.students.filter(s => s.present && (!noRepeat || !s.drawn));
+
+            if (pool.length === 0 && noRepeat) {
+                const presentStudents = cls.students.filter(s => s.present);
+                if (presentStudents.length === 0) {
+                    showToast("Niemand als anwesend markiert!");
+                    return;
+                }
+                presentStudents.forEach(s => s.drawn = false);
+                pool = presentStudents;
+                showToast("Alle waren dran – neue Runde gestartet!");
+            }
+
+            if (pool.length === 0) return;
+
+            const chosen = pool[Math.floor(Math.random() * pool.length)];
+            chosen.drawn = true;
+
+            const box = document.getElementById('pickedResultBox');
+            box.innerHTML = `
+                <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-600 mb-1">Ausgewählt</span>
+                <div style="font-size: ${1.75 * currentZoom}rem" class="font-extrabold text-slate-900 tracking-tight animate-pop">
+                    ${escapeHtml(chosen.name)}
+                </div>
+            `;
+
+            renderAppContent();
+            saveClassesToCloud();
+        }
+
+        function generateGroups() {
+            const cls = classesData.find(c => c.id === activeClassId);
+            if (!cls) return;
+
+            const present = cls.students.filter(s => s.present).map(s => s.name);
+            if (present.length < 2) {
+                showToast("Mindestens 2 anwesende Personen nötig.");
+                return;
+            }
+
+            const shuffled = [...present];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+
+            const mode = document.getElementById('groupModeSelect').value;
+            const val = Math.max(2, parseInt(document.getElementById('groupNumberInput').value, 10) || 3);
+
+            let numGroups = mode === 'numGroups'
+                ? Math.min(val, Math.floor(shuffled.length / 2))
+                : Math.max(1, Math.ceil(shuffled.length / val));
+
+            const groups = Array.from({ length: numGroups }, () => []);
+            shuffled.forEach((name, idx) => {
+                groups[idx % numGroups].push(name);
+            });
+
+            window.lastGeneratedGroups = groups;
+            swapSelection = null;
+            renderGroupsGrid();
+        }
+
+        function renderGroupsGrid() {
+            const grid = document.getElementById('groupsResultGrid');
+            const groups = window.lastGeneratedGroups || [];
+            grid.innerHTML = '';
+
+            groups.forEach((members, gIdx) => {
+                const card = document.createElement('div');
+                card.className = "bg-slate-50 border border-slate-200 rounded-2xl p-3 flex flex-col gap-2 animate-pop";
+                card.innerHTML = `
+                    <div class="flex items-center justify-between border-b border-slate-200/70 pb-1.5">
+                        <span class="text-xs font-extrabold text-indigo-700">Gruppe ${gIdx + 1}</span>
+                        <span class="text-[10px] font-mono-num font-bold text-slate-400">${members.length} Pers.</span>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        ${members.map((m, mIdx) => {
+                            const isSelected = swapSelection && swapSelection.gIdx === gIdx && swapSelection.mIdx === mIdx;
+                            return `
+                                <button type="button" onclick="handleSwapClick(${gIdx}, ${mIdx})" style="font-size: ${0.8 * currentZoom}rem" class="text-left px-2.5 py-1.5 rounded-lg font-bold transition-colors ${isSelected ? 'bg-amber-200 text-amber-950 ring-2 ring-amber-500' : 'bg-white hover:bg-indigo-50 text-slate-800 border border-slate-200/60'}">
+                                    ${escapeHtml(m)}
+                                </button>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function handleSwapClick(gIdx, mIdx) {
+            if (!swapSelection) {
+                swapSelection = { gIdx, mIdx };
+                renderGroupsGrid();
+                return;
+            }
+            const groups = window.lastGeneratedGroups;
+            const first = groups[swapSelection.gIdx][swapSelection.mIdx];
+            groups[swapSelection.gIdx][swapSelection.mIdx] = groups[gIdx][mIdx];
+            groups[gIdx][mIdx] = first;
+            swapSelection = null;
+            renderGroupsGrid();
+            showToast("Personen getauscht!");
+        }
+
+        function adjustZoom(delta) {
+            currentZoom = Math.min(1.6, Math.max(0.8, currentZoom + delta));
+            renderGroupsGrid();
+        }
+        function resetZoom() {
+            currentZoom = 1.0;
+            renderGroupsGrid();
+        }
+
+        function escapeHtml(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            t.classList.remove('opacity-0');
+            setTimeout(() => t.classList.add('opacity-0'), 2800);
+        }
+    </script>
+</body>
+</html>
