@@ -92,7 +92,7 @@
                 <span>Als Gast ansehen (Demo)</span>
             </button>
             <p class="text-[11px] text-slate-500 leading-relaxed -mt-1">
-                Der Gast-Modus zeigt eine Demo-Klasse mit Fantasienamen. Es wird nichts gespeichert.
+                Der Gast-Modus zeigt drei Demo-Klassen mit Fantasienamen. Es wird nichts gespeichert.
             </p>
         </div>
     </div>
@@ -441,15 +441,21 @@
             console.error("Firebase Init Fehler:", e);
         }
 
-        // Demo-Klasse für den Gast-Modus (reine Fantasienamen)
-        const DEMO_NAMES = ["Ada", "Bruno", "Cleo", "Dex", "Elio", "Fenja", "Gino", "Hedda", "Ivo", "Jola",
-                            "Kuno", "Lumi", "Milo", "Nala", "Otto", "Pia", "Quirin", "Rhea", "Sami", "Tilda", "Ulla", "Vito"];
+        // Drei Demo-Klassen für den Gast-Modus (reine Fantasienamen)
+        const DEMO_CLASSES = [
+            { id: 'demo-1a', name: 'Demo 1a', names: ["Ada", "Bruno", "Cleo", "Dex", "Elio", "Fenja", "Gino", "Hedda", "Ivo", "Jola",
+                                                       "Kuno", "Lumi", "Milo", "Nala", "Otto", "Pia", "Quirin", "Rhea"] },
+            { id: 'demo-2b', name: 'Demo 2b', names: ["Aurel", "Bela", "Cosmo", "Dalia", "Emil", "Flora", "Gustav", "Hanna", "Ilian", "Juna", "Kian",
+                                                       "Leonie", "Mattia", "Nora", "Oskar", "Paula", "Rafael", "Selma", "Theo", "Uma", "Valentin", "Wanda"] },
+            { id: 'demo-3c', name: 'Demo 3c', names: ["Alva", "Bastian", "Carla", "Dario", "Ella", "Finn", "Greta", "Henri", "Ilvy", "Jonas",
+                                                       "Kira", "Lino", "Mila", "Nevio", "Olivia", "Pablo", "Ronja", "Silas", "Tamara", "Yannick"] }
+        ];
         function buildDemoClasses() {
-            return [{
-                id: 'demo-cls',
-                name: 'Demo 2X',
-                students: DEMO_NAMES.map((n, i) => ({ id: `demo-${i}`, name: n, present: true, drawn: false }))
-            }];
+            return DEMO_CLASSES.map(c => ({
+                id: c.id,
+                name: c.name,
+                students: c.names.map((n, i) => ({ id: `${c.id}-${i}`, name: n, present: true, drawn: false }))
+            }));
         }
 
         // App-Zustand

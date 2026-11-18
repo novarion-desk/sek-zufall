@@ -1,5 +1,8 @@
 # Changelog
 
+## Version 2.3 – 18.11.2026
+- Gast-Modus mit drei Demo-Klassen (Demo 1a: 18, Demo 2b: 22, Demo 3c: 20 Fantasienamen).
+
 ## Version 2.2 – 18.11.2026
 - Einzelperson ziehen: drei Varianten mit ?-Erklärung statt «Ohne Wiederholung»:
   Zufällig · Alle einmal (danach «Alle waren dran», nächster Klick startet neu) · Endlos (sofort neue Runde, letzte Person nicht gleich wieder zuerst).

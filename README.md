@@ -13,6 +13,7 @@ Live-App: https://novarion-desk.github.io/sek-zufall/
 
 ## Zu einer älteren Version zurück
 
+- Version 2.2: https://novarion-desk.github.io/sek-zufall/versions/v2.2/
 - Version 2.1: https://novarion-desk.github.io/sek-zufall/versions/v2/
 - Version 1: https://novarion-desk.github.io/sek-zufall/versions/v1/
 
@@ -22,7 +23,7 @@ Danach Claude sagen, dass die alte Version wieder zur Hauptversion werden soll.
 ## Login
 
 - Nur Anmeldung, keine Registrierung (in Firebase gesperrt).
-- «Als Gast ansehen» zeigt eine Demo-Klasse mit Fantasienamen – nichts wird gespeichert.
+- «Als Gast ansehen» zeigt drei Demo-Klassen mit Fantasienamen – nichts wird gespeichert.
 
 ## Daten & Sicherungen
 
