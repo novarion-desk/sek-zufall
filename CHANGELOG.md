@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 2.2 – 18.11.2026
+- Einzelperson ziehen: drei Varianten mit ?-Erklärung statt «Ohne Wiederholung»:
+  Zufällig · Alle einmal (danach «Alle waren dran», nächster Klick startet neu) · Endlos (sofort neue Runde, letzte Person nicht gleich wieder zuerst).
+  Anzeige «x von y waren dran».
+- Gruppen bilden: Knöpfe statt Dropdown – Max. Teamgrösse 2–8 und Anzahl Gruppen (nur Zahlen, die ohne 1er-Gruppe möglich sind). Ein Klick bildet die Gruppen sofort, nochmals klicken mischt neu.
+
 ## Version 2.1 – 17.11.2026
 - Als App installierbar (Chrome auf Android, Tablet, Mac): Manifest, Service Worker (speichert nichts zwischen), Würfel-Icon.
 

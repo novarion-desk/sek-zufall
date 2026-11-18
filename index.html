@@ -227,10 +227,23 @@
                         <button type="button" id="modeTabSingle" onclick="switchGeneratorMode('single')" class="px-4 py-2 rounded-lg bg-white text-slate-900 shadow-sm transition-all">Einzelperson ziehen</button>
                         <button type="button" id="modeTabGroups" onclick="switchGeneratorMode('groups')" class="px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all">Gruppen bilden</button>
                     </div>
-                    <label id="noRepeatWrapper" class="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer">
-                        <input type="checkbox" id="noRepeatCheck" checked class="rounded text-indigo-600 focus:ring-indigo-500">
-                        <span>Ohne Wiederholung</span>
-                    </label>
+                    <div id="drawModeWrapper" class="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+                        <div class="relative flex items-center">
+                            <button type="button" data-drawmode="random" onclick="setDrawMode('random')" class="draw-mode-btn px-3 py-2 rounded-l-xl border">Zufällig</button>
+                            <button type="button" onclick="toggleTip(event,'tip-random')" class="tip-btn px-2 py-2 rounded-r-xl border border-l-0 text-slate-400 hover:text-indigo-600" aria-label="Erklärung Zufällig">?</button>
+                            <div id="tip-random" class="tip hidden absolute right-0 top-full mt-1.5 z-20 w-60 bg-slate-900 text-white text-[11px] font-medium leading-snug rounded-xl p-2.5 shadow-lg">Jede Ziehung ist frei. Dieselbe Person kann mehrmals – auch zweimal hintereinander – drankommen.</div>
+                        </div>
+                        <div class="relative flex items-center">
+                            <button type="button" data-drawmode="round" onclick="setDrawMode('round')" class="draw-mode-btn px-3 py-2 rounded-l-xl border">Alle einmal</button>
+                            <button type="button" onclick="toggleTip(event,'tip-round')" class="tip-btn px-2 py-2 rounded-r-xl border border-l-0 text-slate-400 hover:text-indigo-600" aria-label="Erklärung Alle einmal">?</button>
+                            <div id="tip-round" class="tip hidden absolute right-0 top-full mt-1.5 z-20 w-60 bg-slate-900 text-white text-[11px] font-medium leading-snug rounded-xl p-2.5 shadow-lg">Alle Anwesenden kommen genau einmal dran. Danach erscheint «Alle waren dran» – erst der nächste Klick startet eine neue Runde.</div>
+                        </div>
+                        <div class="relative flex items-center">
+                            <button type="button" data-drawmode="endless" onclick="setDrawMode('endless')" class="draw-mode-btn px-3 py-2 rounded-l-xl border">Endlos</button>
+                            <button type="button" onclick="toggleTip(event,'tip-endless')" class="tip-btn px-2 py-2 rounded-r-xl border border-l-0 text-slate-400 hover:text-indigo-600" aria-label="Erklärung Endlos">?</button>
+                            <div id="tip-endless" class="tip hidden absolute right-0 top-full mt-1.5 z-20 w-60 bg-slate-900 text-white text-[11px] font-medium leading-snug rounded-xl p-2.5 shadow-lg">Alle Anwesenden kommen einmal dran, dann geht es ohne Pause mit einer neuen Runde weiter. Die letzte Person der alten Runde kommt nicht gleich als erste wieder.</div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Einzelziehung -->
@@ -244,21 +257,16 @@
 
                 <!-- Gruppen -->
                 <div id="groupsModePanel" class="hidden flex flex-col gap-5">
-                    <div class="flex flex-wrap items-center justify-between gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
-                        <div class="flex items-center gap-2 text-xs">
-                            <select id="groupModeSelect" class="bg-white border border-slate-200 rounded-xl px-3 py-2 font-bold text-slate-700 focus:outline-none">
-                                <option value="maxSize">Max. Teamgrösse</option>
-                                <option value="numGroups">Anzahl Gruppen</option>
-                            </select>
-                            <input type="number" id="groupNumberInput" value="3" min="2" max="12" class="w-16 bg-white border border-slate-200 rounded-xl px-2.5 py-2 font-bold text-center text-slate-900">
+                    <div class="flex flex-col gap-2.5 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70 text-xs">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="w-32 shrink-0 font-bold text-slate-700">Max. Teamgrösse</span>
+                            <div id="teamSizeButtons" class="flex flex-wrap gap-1.5"></div>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <span class="hidden md:inline text-[11px] text-slate-500 mr-1">Klick auf 2 Namen = Tauschen</span>
-                            <button type="button" onclick="generateGroups()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-extrabold shadow-sm transition-colors flex items-center gap-1.5">
-                                <i data-lucide="shuffle" class="w-3.5 h-3.5"></i>
-                                <span>Gruppen mischen</span>
-                            </button>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="w-32 shrink-0 font-bold text-slate-700">Anzahl Gruppen</span>
+                            <div id="groupCountButtons" class="flex flex-wrap gap-1.5"></div>
                         </div>
+                        <p class="text-[11px] text-slate-500">Klick auf eine Zahl = Gruppen bilden · nochmals klicken = neu mischen · Klick auf 2 Namen = tauschen</p>
                     </div>
                     <p id="groupsInfoLine" class="hidden -mt-2 text-[11px] text-slate-500"></p>
                     <div id="groupsResultGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
@@ -284,7 +292,11 @@
                 </div>
                 <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70">
                     <div class="font-extrabold text-slate-900 mb-1">2. Gruppen &amp; Tauschen</div>
-                    <p>«Gruppen mischen» klappt die Anwesenheit zu. Es entstehen nie 1er-Gruppen: Geht es nicht auf, wird eine Gruppe um eine Person grösser. Zwei Namen nacheinander anklicken = tauschen.</p>
+                    <p>Auf eine Zahl bei «Max. Teamgrösse» oder «Anzahl Gruppen» klicken – die Gruppen sind sofort gebildet, nochmals klicken mischt neu. Die Gruppen sind höchstens um eine Person unterschiedlich gross, und es gibt nie 1er-Gruppen. Zwei Namen nacheinander anklicken = tauschen.</p>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70">
+                    <div class="font-extrabold text-slate-900 mb-1">Einzelperson ziehen</div>
+                    <p><strong>Zufällig:</strong> jede Ziehung frei, Wiederholungen möglich. <strong>Alle einmal:</strong> jede Person einmal, danach «Alle waren dran», der nächste Klick startet neu. <strong>Endlos:</strong> jede Person einmal, dann sofort die nächste Runde.</p>
                 </div>
                 <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70">
                     <div class="font-extrabold text-slate-900 mb-1">3. Retour</div>
@@ -394,7 +406,7 @@
     </div>
 
     <script>
-        const APP_VERSION = '2.1';
+        const APP_VERSION = '2.2';
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
@@ -453,6 +465,10 @@
         let isAttendanceOpen = true;
         let undoStack = [];
         let lastManualExportAt = '';
+        let drawMode = localStorage.getItem('sekZufallDrawMode') || 'round';   // random | round | endless
+        let roundEndShownFor = null;   // Klasse, bei der «Alle waren dran» gerade angezeigt wird
+        let lastPickedId = {};         // pro Klasse: zuletzt gezogene Person
+        let lastGroupChoice = null;    // {mode, val} der zuletzt gewählten Gruppen-Zahl
 
         function newId(prefix) {
             return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -512,6 +528,8 @@
             activeClassId = prev.activeClassId;
             lastGeneratedGroups = prev.lastGeneratedGroups;
             swapSelection = null;
+            roundEndShownFor = null;
+            updatePickButtonLabel();
             setAttendancePanelOpen(prev.isAttendanceOpen);
             document.getElementById('pickedResultBox').innerHTML = prev.pickedHtml || pickedPlaceholder();
             renderAppContent();
@@ -536,6 +554,8 @@
             if (savedEmail) document.getElementById('authEmailInput').value = savedEmail;
             document.getElementById('pickedResultBox').innerHTML = pickedPlaceholder();
             applyZoom();
+            renderDrawModeButtons();
+            updatePickButtonLabel();
             setAttendancePanelOpen(true);
             renderGroupsGrid();
 
@@ -937,7 +957,7 @@
             const single = mode === 'single';
             document.getElementById('singleModePanel').classList.toggle('hidden', !single);
             document.getElementById('groupsModePanel').classList.toggle('hidden', single);
-            document.getElementById('noRepeatWrapper').classList.toggle('hidden', !single);
+            document.getElementById('drawModeWrapper').classList.toggle('hidden', !single);
             const on = "px-4 py-2 rounded-lg bg-white text-slate-900 shadow-sm transition-all";
             const off = "px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all";
             document.getElementById('modeTabSingle').className = single ? on : off;
@@ -1026,6 +1046,7 @@
                 `;
                 list.appendChild(chip);
             });
+            renderGroupButtons();
             refreshIcons();
         }
 
@@ -1034,6 +1055,9 @@
             activeClassId = id;
             swapSelection = null;
             lastGeneratedGroups = [];
+            lastGroupChoice = null;
+            roundEndShownFor = null;
+            updatePickButtonLabel();
             document.getElementById('pickedResultBox').innerHTML = pickedPlaceholder();
             setAttendancePanelOpen(true);
             renderAppContent();
@@ -1069,6 +1093,8 @@
             if (!cls) return;
             pushUndoSnapshot("Runde zurückgesetzt");
             cls.students.forEach(s => s.drawn = false);
+            roundEndShownFor = null;
+            updatePickButtonLabel();
             document.getElementById('pickedResultBox').innerHTML = pickedPlaceholder('Runde zurückgesetzt');
             renderAppContent();
             saveClassesToCloud();
@@ -1193,34 +1219,103 @@
             return Math.floor(Math.random() * max);
         }
 
+        // ---------- Ziehmodus ----------
+        function setDrawMode(mode) {
+            drawMode = mode;
+            localStorage.setItem('sekZufallDrawMode', mode);
+            roundEndShownFor = null;
+            renderDrawModeButtons();
+            updatePickButtonLabel();
+        }
+
+        function renderDrawModeButtons() {
+            document.querySelectorAll('.draw-mode-btn').forEach(b => {
+                const on = b.dataset.drawmode === drawMode;
+                b.className = 'draw-mode-btn px-3 py-2 rounded-l-xl border transition-colors ' +
+                    (on ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50');
+                const tipBtn = b.nextElementSibling;
+                tipBtn.className = 'tip-btn px-2 py-2 rounded-r-xl border border-l-0 transition-colors ' +
+                    (on ? 'bg-indigo-500 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-400 hover:text-indigo-600');
+            });
+        }
+
+        function toggleTip(event, id) {
+            event.stopPropagation();
+            document.querySelectorAll('.tip').forEach(t => t.classList.toggle('hidden', t.id !== id));
+        }
+        document.addEventListener('click', () => document.querySelectorAll('.tip').forEach(t => t.classList.add('hidden')));
+        document.addEventListener('mouseover', (e) => {
+            const btn = e.target.closest && e.target.closest('.tip-btn');
+            document.querySelectorAll('.tip').forEach(t => {
+                if (btn && btn.nextElementSibling === t) t.classList.remove('hidden');
+                else if (btn) t.classList.add('hidden');
+            });
+        });
+
+        function updatePickButtonLabel() {
+            const label = document.querySelector('#pickBtn span');
+            if (!label) return;
+            label.innerText = (drawMode === 'round' && roundEndShownFor === activeClassId) ? 'Neue Runde starten' : 'Zufällige Person ziehen';
+        }
+
+        function roundProgressText(cls) {
+            if (drawMode === 'random') return '';
+            const present = cls.students.filter(s => s.present);
+            const done = present.filter(s => s.drawn).length;
+            return `${done} von ${present.length} waren dran`;
+        }
+
+        function showPicked(cls, name) {
+            const progress = roundProgressText(cls);
+            document.getElementById('pickedResultBox').innerHTML = `
+                <span class="text-[11px] font-bold uppercase tracking-widest text-indigo-600 mb-1.5">Ausgewählt</span>
+                <div class="text-[2.4rem] leading-tight font-black text-slate-900 tracking-tight animate-reveal">${escapeHtml(name)}</div>
+                ${progress ? `<span class="mt-2 text-[11px] font-semibold text-slate-400">${progress}</span>` : ''}
+            `;
+        }
+
         function pickRandomStudent() {
             const cls = getActiveClass();
             if (!cls) return;
+            const present = cls.students.filter(s => s.present);
+            if (present.length === 0) { showToast("Niemand als anwesend markiert!"); return; }
 
-            const noRepeat = document.getElementById('noRepeatCheck').checked;
-            let pool = cls.students.filter(s => s.present && (!noRepeat || !s.drawn));
-
-            if (pool.length === 0 && noRepeat) {
-                const presentStudents = cls.students.filter(s => s.present);
-                if (presentStudents.length === 0) { showToast("Niemand als anwesend markiert!"); return; }
-                pushUndoSnapshot("Ziehung (neue Runde)");
-                presentStudents.forEach(s => s.drawn = false);
-                pool = presentStudents;
-                showToast("Alle waren dran – neue Runde!");
-            } else if (pool.length === 0) {
-                showToast("Niemand als anwesend markiert!");
-                return;
-            } else {
+            let pool;
+            if (drawMode === 'random') {
+                pool = present;
                 pushUndoSnapshot("Einzelziehung");
+            } else {
+                pool = present.filter(s => !s.drawn);
+                if (pool.length === 0) {
+                    // «Alle einmal»: zuerst eine Schluss-Anzeige, erst der nächste Klick startet neu
+                    if (drawMode === 'round' && roundEndShownFor !== cls.id) {
+                        roundEndShownFor = cls.id;
+                        document.getElementById('pickedResultBox').innerHTML = `
+                            <div class="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2"><i data-lucide="check" class="w-6 h-6"></i></div>
+                            <div class="text-2xl font-black text-slate-900 animate-reveal">Alle waren dran!</div>
+                            <span class="mt-1.5 text-xs font-semibold text-slate-500">${present.length} von ${present.length} – nächster Klick startet eine neue Runde</span>
+                        `;
+                        refreshIcons();
+                        updatePickButtonLabel();
+                        return;
+                    }
+                    pushUndoSnapshot("Neue Runde");
+                    present.forEach(s => s.drawn = false);
+                    pool = present.slice();
+                    // Endlos: die zuletzt gezogene Person nicht gleich wieder als erste
+                    if (pool.length > 1 && lastPickedId[cls.id]) pool = pool.filter(s => s.id !== lastPickedId[cls.id]);
+                    if (drawMode === 'endless') showToast("Alle waren dran – neue Runde!");
+                } else {
+                    pushUndoSnapshot("Einzelziehung");
+                }
             }
+            roundEndShownFor = null;
 
             const chosen = pool[randomInt(pool.length)];
             chosen.drawn = true;
-
-            document.getElementById('pickedResultBox').innerHTML = `
-                <span class="text-[11px] font-bold uppercase tracking-widest text-indigo-600 mb-1.5">Ausgewählt</span>
-                <div class="text-[2.4rem] leading-tight font-black text-slate-900 tracking-tight animate-reveal">${escapeHtml(chosen.name)}</div>
-            `;
+            lastPickedId[cls.id] = chosen.id;
+            showPicked(cls, chosen.name);
+            updatePickButtonLabel();
             renderAppContent();
             saveClassesToCloud();
         }
@@ -1231,6 +1326,27 @@
             if (maxGroups < 1) return 1;
             const wanted = mode === 'numGroups' ? val : Math.ceil(n / val);
             return Math.max(1, Math.min(wanted, maxGroups));
+        }
+
+        function chooseGroups(mode, val) {
+            lastGroupChoice = { mode, val };
+            generateGroups();
+            renderGroupButtons();
+        }
+
+        function renderGroupButtons() {
+            const cls = getActiveClass();
+            const n = cls ? cls.students.filter(s => s.present).length : 0;
+            const btn = (mode, v) => {
+                const on = lastGroupChoice && lastGroupChoice.mode === mode && lastGroupChoice.val === v;
+                return `<button type="button" onclick="chooseGroups('${mode}', ${v})" class="w-9 h-9 rounded-xl text-sm font-extrabold border transition-colors ${on ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-700 hover:bg-indigo-50 hover:border-indigo-300'}">${v}</button>`;
+            };
+            const sizes = [2, 3, 4, 5, 6, 7, 8];
+            const maxGroups = Math.floor(n / 2);
+            const counts = [];
+            for (let g = 2; g <= maxGroups; g++) counts.push(g);
+            document.getElementById('teamSizeButtons').innerHTML = n >= 2 ? sizes.map(v => btn('maxSize', v)).join('') : '<span class="text-slate-400">mind. 2 Anwesende nötig</span>';
+            document.getElementById('groupCountButtons').innerHTML = counts.length ? counts.map(v => btn('numGroups', v)).join('') : '<span class="text-slate-400">mind. 4 Anwesende nötig</span>';
         }
 
         function generateGroups() {
@@ -1247,8 +1363,9 @@
                 [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
             }
 
-            const mode = document.getElementById('groupModeSelect').value;
-            const val = Math.max(2, parseInt(document.getElementById('groupNumberInput').value, 10) || 3);
+            if (!lastGroupChoice) return;
+            const mode = lastGroupChoice.mode;
+            const val = lastGroupChoice.val;
             const numGroups = computeGroupCount(shuffled.length, mode, val);
 
             const groups = Array.from({ length: numGroups }, () => []);
@@ -1274,7 +1391,7 @@
             if (!grid) return;
             if (!lastGeneratedGroups || lastGeneratedGroups.length === 0) {
                 document.getElementById('groupsInfoLine').classList.add('hidden');
-                grid.innerHTML = `<div class="col-span-full py-10 text-center text-xs text-slate-400 italic">Teamgrösse oder Gruppenanzahl wählen und auf «Gruppen mischen» klicken.</div>`;
+                grid.innerHTML = `<div class="col-span-full py-10 text-center text-xs text-slate-400 italic">Auf eine Zahl klicken – die Gruppen werden sofort gebildet.</div>`;
                 return;
             }
             grid.innerHTML = '';
