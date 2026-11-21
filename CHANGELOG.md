@@ -1,5 +1,8 @@
 # Changelog
 
+## Version 2.4 – 21.11.2026
+- Neuer Knopf «Feedback» in der Kopfzeile: öffnet ein anonymes Formular für Fehler, Inhaltsfehler und Wünsche. Version und Gerät werden automatisch mitgegeben; es werden keine Namen abgefragt.
+
 ## Version 2.3 – 18.11.2026
 - Gast-Modus mit drei Demo-Klassen (Demo 1a: 18, Demo 2b: 22, Demo 3c: 20 Fantasienamen).
 

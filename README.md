@@ -13,6 +13,8 @@ Live-App: https://novarion-desk.github.io/sek-zufall/
 
 ## Zu einer älteren Version zurück
 
+- Version 2.4: https://novarion-desk.github.io/sek-zufall/versions/v2.4/
+- Version 2.3: https://novarion-desk.github.io/sek-zufall/versions/v2.3/
 - Version 2.2: https://novarion-desk.github.io/sek-zufall/versions/v2.2/
 - Version 2.1: https://novarion-desk.github.io/sek-zufall/versions/v2/
 - Version 1: https://novarion-desk.github.io/sek-zufall/versions/v1/
@@ -33,3 +35,6 @@ Danach Claude sagen, dass die alte Version wieder zur Hauptversion werden soll.
   in der App unter «Konto» mit einem Klick wiederherstellbar. Vor jeder Wiederherstellung und jedem Import wird der aktuelle Stand zusätzlich gesichert.
 - **Manuell:** «Konto» → «Backup herunterladen» (.json). Empfohlen 1× pro Woche (gelber Punkt nach 7 Tagen).
 - Nur Vornamen erfassen.
+
+## Feedback
+Der Knopf «💬 Feedback» öffnet ein externes, anonymes Formular bei Tally (Fehler, Wünsche, Inhalte). Nur dann werden Angaben gesendet – zusammen mit App-Name, Version und Gerätetyp. Namen werden nicht abgefragt.

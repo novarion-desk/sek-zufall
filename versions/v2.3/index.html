@@ -1,0 +1,1476 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klassen-Zufallsgenerator & Gruppen-Tool – Sek A</title>
+    <link rel="manifest" href="../../manifest.webmanifest">
+    <meta name="theme-color" content="#312E81">
+    <link rel="icon" type="image/svg+xml" href="../../icons/icon.svg">
+    <link rel="icon" type="image/png" sizes="32x32" href="../../icons/favicon-32.png">
+    <link rel="apple-touch-icon" href="../../icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-title" content="Zufall">
+    <meta name="mobile-web-app-capable" content="yes">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+    <!-- Firebase SDKs (Compat v10 für direkte HTML-Nutzung) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+
+        @keyframes popReveal {
+            0% { transform: scale(0.92) translateY(6px); opacity: 0; }
+            70% { transform: scale(1.02) translateY(-1px); opacity: 1; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .animate-reveal { animation: popReveal 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    </style>
+</head>
+<body class="bg-[#F4F6FA] text-slate-800 min-h-screen flex flex-col antialiased selection:bg-indigo-100 selection:text-indigo-900">
+
+    <!-- ===================================================================== -->
+    <!-- LADEBILDSCHIRM (bis Firebase den Login-Status kennt)                   -->
+    <!-- ===================================================================== -->
+    <div id="loadingScreen" class="flex-1 flex items-center justify-center p-6">
+        <div class="flex items-center gap-3 text-sm font-semibold text-slate-500">
+            <span class="w-3 h-3 rounded-full bg-indigo-500 animate-pulse"></span>
+            Lade …
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- LOGIN-SEITE (Start ohne Anmeldung)                                     -->
+    <!-- ===================================================================== -->
+    <div id="loginScreen" class="hidden flex-1 flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-6 md:p-7 shadow-xl border border-slate-200 flex flex-col gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-600 text-white shadow-md flex items-center justify-center shrink-0">
+                    <i data-lucide="sparkles" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-extrabold tracking-tight text-slate-900">Klassen-Zufallsgenerator</h1>
+                    <p class="text-xs text-slate-500">Bitte anmelden, um deine Klassen zu laden</p>
+                </div>
+            </div>
+
+            <form id="loginForm" onsubmit="handleLoginSubmit(event)" class="flex flex-col gap-3">
+                <div id="loginErrorBox" class="hidden bg-rose-50 border border-rose-200 text-rose-700 rounded-xl p-3 text-xs font-semibold"></div>
+                <div id="loginInfoBox" class="hidden bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl p-3 text-xs font-semibold"></div>
+
+                <div>
+                    <label for="authEmailInput" class="block text-xs font-bold text-slate-700 mb-1">E-Mail-Adresse</label>
+                    <input type="email" id="authEmailInput" name="username" autocomplete="username" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label for="authPasswordInput" class="block text-xs font-bold text-slate-700 mb-1">Passwort</label>
+                    <input type="password" id="authPasswordInput" name="password" autocomplete="current-password" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+
+                <div class="flex items-center justify-between gap-2">
+                    <label class="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+                        <input type="checkbox" id="rememberLoginCheck" checked class="rounded text-indigo-600 focus:ring-indigo-500">
+                        <span>Angemeldet bleiben</span>
+                    </label>
+                    <button type="button" onclick="sendPasswordReset()" class="text-[11px] font-semibold text-indigo-600 hover:underline">Passwort vergessen?</button>
+                </div>
+
+                <button type="submit" id="loginSubmitBtn" class="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2">
+                    <i data-lucide="log-in" class="w-4 h-4"></i>
+                    <span>Anmelden</span>
+                </button>
+            </form>
+
+            <div class="flex items-center gap-3 text-[11px] text-slate-400">
+                <span class="flex-1 h-px bg-slate-200"></span>oder<span class="flex-1 h-px bg-slate-200"></span>
+            </div>
+
+            <button type="button" onclick="startGuestMode()" class="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 rounded-xl text-sm font-bold transition-colors flex items-center justify-center gap-2">
+                <i data-lucide="eye" class="w-4 h-4"></i>
+                <span>Als Gast ansehen (Demo)</span>
+            </button>
+            <p class="text-[11px] text-slate-500 leading-relaxed -mt-1">
+                Der Gast-Modus zeigt drei Demo-Klassen mit Fantasienamen. Es wird nichts gespeichert.
+            </p>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- APP (nach Login oder im Gast-Modus)                                    -->
+    <!-- ===================================================================== -->
+    <div id="appShell" class="hidden flex-1 flex flex-col">
+
+    <header class="w-full bg-white border-b border-slate-200/80 py-3 px-4 md:px-8 flex flex-wrap justify-between items-center gap-3 sticky top-0 z-30 shadow-sm">
+        <div class="flex items-center gap-3.5">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-600 text-white shadow-md shadow-indigo-500/20 flex items-center justify-center shrink-0 ring-1 ring-black/5">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                    <line x1="12" y1="22.08" x2="12" y2="12"/>
+                    <circle cx="12" cy="7" r="1" fill="currentColor"/>
+                    <circle cx="8" cy="14" r="1" fill="currentColor"/>
+                    <circle cx="16" cy="14" r="1" fill="currentColor"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-base md:text-lg font-extrabold tracking-tight text-slate-900">Klassen-Zufallsgenerator</h1>
+                <div class="flex items-center gap-2 mt-0.5 text-xs">
+                    <span id="syncDot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+                    <span id="syncStatusText" class="text-slate-500 font-medium">–</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <button type="button" id="undoBtn" onclick="undoLastAction()" disabled class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed transition-all" title="Letzten Schritt rückgängig machen">
+                <i data-lucide="undo-2" class="w-4 h-4"></i>
+                <span class="hidden md:inline">Retour</span>
+            </button>
+
+            <div class="hidden sm:flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 text-xs font-bold">
+                <button type="button" onclick="adjustZoom(-0.1)" class="px-2 py-1 rounded-lg hover:bg-white text-slate-600 transition-colors" title="Verkleinern">A−</button>
+                <button type="button" id="zoomLabel" onclick="resetZoom()" class="px-2 py-1 rounded-lg hover:bg-white text-slate-500 text-[11px] min-w-[3rem]" title="Normalgrösse">100%</button>
+                <button type="button" onclick="adjustZoom(0.1)" class="px-2 py-1 rounded-lg hover:bg-white text-slate-600 transition-colors" title="Vergrössern">A+</button>
+            </div>
+
+            <button type="button" onclick="openHelpModal()" class="w-9 h-9 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 flex items-center justify-center transition-colors" title="Anleitung & Hilfe öffnen">
+                <i data-lucide="circle-help" class="w-4 h-4"></i>
+            </button>
+
+            <button type="button" id="accountHeaderBtn" onclick="openAccountModal()" class="relative flex items-center gap-2 px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm">
+                <i data-lucide="cloud" class="w-3.5 h-3.5 text-indigo-300"></i>
+                <span id="accountHeaderLabel">Konto</span>
+                <span id="backupReminderDot" class="hidden absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-400 ring-2 ring-white" title="Backup-Datei fällig"></span>
+            </button>
+        </div>
+    </header>
+
+    <main id="mainArea" class="flex-1 max-w-6xl w-full mx-auto p-4 md:p-6 flex flex-col gap-4">
+
+        <!-- Gast-Hinweis -->
+        <div id="guestBanner" class="hidden bg-amber-50 border border-amber-200 rounded-2xl p-3 px-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div class="flex items-center gap-2.5 text-amber-950">
+                <span class="p-1.5 rounded-lg bg-amber-100 text-amber-700"><i data-lucide="eye" class="w-4 h-4"></i></span>
+                <span><strong>Demo-Modus:</strong> Fantasienamen, nichts wird gespeichert. Beim Neuladen ist alles wieder wie am Anfang.</span>
+            </div>
+            <button type="button" onclick="leaveGuestMode()" class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold transition-colors shrink-0">Zum Login</button>
+        </div>
+
+        <!-- Klassen-Auswahlleiste -->
+        <div class="bg-white border border-slate-200/80 rounded-2xl p-3 px-4 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+            <div class="flex items-center flex-wrap gap-2" id="classTabsContainer"></div>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="openNewClassModal()" class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-xl text-xs font-bold transition-colors">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                    <span>Klasse erfassen</span>
+                </button>
+                <button type="button" id="editClassBtn" onclick="openEditClassModal()" class="hidden flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors">
+                    <i data-lucide="settings-2" class="w-3.5 h-3.5"></i>
+                    <span>Bearbeiten</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Leerzustand -->
+        <div id="emptyClassesState" class="hidden bg-white border border-slate-200/80 rounded-3xl p-8 md:p-10 text-center flex flex-col items-center gap-4 shadow-sm">
+            <div class="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <i data-lucide="users" class="w-7 h-7"></i>
+            </div>
+            <div class="space-y-1 max-w-md">
+                <h2 class="text-base font-extrabold text-slate-900">Noch keine Klasse</h2>
+                <p class="text-xs text-slate-500 leading-relaxed">Erfasse deine erste Klasse – nur Vornamen.</p>
+            </div>
+            <button type="button" onclick="openNewClassModal()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm">+ Klasse erfassen</button>
+        </div>
+
+        <!-- Workspace -->
+        <div id="workspaceContainer" class="hidden flex flex-col gap-4">
+
+            <!-- 1. Anwesenheit (klappbar) -->
+            <section class="bg-white border border-slate-200/80 rounded-3xl overflow-hidden shadow-sm transition-all">
+                <div onclick="toggleAttendancePanel()" class="p-4 px-5 flex flex-wrap items-center justify-between gap-3 cursor-pointer hover:bg-slate-50/70 transition-colors select-none">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                            <i data-lucide="user-check" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h2 id="activeClassTitle" class="text-sm md:text-base font-extrabold text-slate-900">Anwesenheit – Klasse</h2>
+                                <span id="attendanceBadge" class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700">0 / 0 anwesend</span>
+                            </div>
+                            <p id="attendanceCollapseHint" class="text-[11px] text-slate-500 mt-0.5">Klicke auf einen Namen, um An-/Abwesenheit zu wechseln</p>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2" onclick="event.stopPropagation()">
+                        <button type="button" onclick="setAllPresent(true)" class="px-2.5 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition-colors">Alle da</button>
+                        <button type="button" onclick="setAllPresent(false)" class="px-2.5 py-1.5 text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 rounded-xl transition-colors">Alle weg</button>
+                        <button type="button" onclick="resetDrawnHistory()" class="px-2.5 py-1.5 text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 rounded-xl transition-colors">Reset Runde</button>
+                        <button type="button" onclick="toggleAttendancePanel()" class="flex items-center gap-1 px-3 py-1.5 text-xs font-bold bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-colors">
+                            <span id="toggleAttendanceLabel">Ausblenden</span>
+                            <span id="toggleAttendanceChevron" class="inline-flex"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="attendanceBody" class="px-5 pb-5 pt-2 border-t border-slate-100">
+                    <div id="studentsChecklist" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2"></div>
+                </div>
+            </section>
+
+            <!-- 2. Generator -->
+            <section class="bg-white border border-slate-200/80 rounded-3xl p-5 md:p-7 flex flex-col gap-5 shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                    <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
+                        <button type="button" id="modeTabSingle" onclick="switchGeneratorMode('single')" class="px-4 py-2 rounded-lg bg-white text-slate-900 shadow-sm transition-all">Einzelperson ziehen</button>
+                        <button type="button" id="modeTabGroups" onclick="switchGeneratorMode('groups')" class="px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all">Gruppen bilden</button>
+                    </div>
+                    <div id="drawModeWrapper" class="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+                        <div class="relative flex items-center">
+                            <button type="button" data-drawmode="random" onclick="setDrawMode('random')" class="draw-mode-btn px-3 py-2 rounded-l-xl border">Zufällig</button>
+                            <button type="button" onclick="toggleTip(event,'tip-random')" class="tip-btn px-2 py-2 rounded-r-xl border border-l-0 text-slate-400 hover:text-indigo-600" aria-label="Erklärung Zufällig">?</button>
+                            <div id="tip-random" class="tip hidden absolute right-0 top-full mt-1.5 z-20 w-60 bg-slate-900 text-white text-[11px] font-medium leading-snug rounded-xl p-2.5 shadow-lg">Jede Ziehung ist frei. Dieselbe Person kann mehrmals – auch zweimal hintereinander – drankommen.</div>
+                        </div>
+                        <div class="relative flex items-center">
+                            <button type="button" data-drawmode="round" onclick="setDrawMode('round')" class="draw-mode-btn px-3 py-2 rounded-l-xl border">Alle einmal</button>
+                            <button type="button" onclick="toggleTip(event,'tip-round')" class="tip-btn px-2 py-2 rounded-r-xl border border-l-0 text-slate-400 hover:text-indigo-600" aria-label="Erklärung Alle einmal">?</button>
+                            <div id="tip-round" class="tip hidden absolute right-0 top-full mt-1.5 z-20 w-60 bg-slate-900 text-white text-[11px] font-medium leading-snug rounded-xl p-2.5 shadow-lg">Alle Anwesenden kommen genau einmal dran. Danach erscheint «Alle waren dran» – erst der nächste Klick startet eine neue Runde.</div>
+                        </div>
+                        <div class="relative flex items-center">
+                            <button type="button" data-drawmode="endless" onclick="setDrawMode('endless')" class="draw-mode-btn px-3 py-2 rounded-l-xl border">Endlos</button>
+                            <button type="button" onclick="toggleTip(event,'tip-endless')" class="tip-btn px-2 py-2 rounded-r-xl border border-l-0 text-slate-400 hover:text-indigo-600" aria-label="Erklärung Endlos">?</button>
+                            <div id="tip-endless" class="tip hidden absolute right-0 top-full mt-1.5 z-20 w-60 bg-slate-900 text-white text-[11px] font-medium leading-snug rounded-xl p-2.5 shadow-lg">Alle Anwesenden kommen einmal dran, dann geht es ohne Pause mit einer neuen Runde weiter. Die letzte Person der alten Runde kommt nicht gleich als erste wieder.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Einzelziehung -->
+                <div id="singleModePanel" class="flex flex-col gap-5">
+                    <div id="pickedResultBox" class="min-h-[190px] rounded-2xl bg-gradient-to-b from-slate-50 to-slate-100/70 border border-slate-200/80 flex flex-col items-center justify-center p-6 text-center"></div>
+                    <button type="button" id="pickBtn" onclick="pickRandomStudent()" class="w-full py-4 px-6 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white rounded-2xl text-sm font-extrabold shadow-md shadow-indigo-600/15 transition-all flex items-center justify-center gap-2">
+                        <i data-lucide="sparkles" class="w-4 h-4"></i>
+                        <span>Zufällige Person ziehen</span>
+                    </button>
+                </div>
+
+                <!-- Gruppen -->
+                <div id="groupsModePanel" class="hidden flex flex-col gap-5">
+                    <div class="flex flex-col gap-2.5 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70 text-xs">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="w-32 shrink-0 font-bold text-slate-700">Max. Teamgrösse</span>
+                            <div id="teamSizeButtons" class="flex flex-wrap gap-1.5"></div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="w-32 shrink-0 font-bold text-slate-700">Anzahl Gruppen</span>
+                            <div id="groupCountButtons" class="flex flex-wrap gap-1.5"></div>
+                        </div>
+                        <p class="text-[11px] text-slate-500">Klick auf eine Zahl = Gruppen bilden · nochmals klicken = neu mischen · Klick auf 2 Namen = tauschen</p>
+                    </div>
+                    <p id="groupsInfoLine" class="hidden -mt-2 text-[11px] text-slate-500"></p>
+                    <div id="groupsResultGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+                </div>
+            </section>
+        </div>
+    </main>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL: HILFE                                                           -->
+    <!-- ===================================================================== -->
+    <div id="helpModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="text-base font-extrabold text-slate-900">Kurzanleitung</h3>
+                <button type="button" onclick="closeModal('helpModal')" class="text-slate-400 hover:text-slate-700 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="space-y-3 text-xs text-slate-700 leading-relaxed">
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70">
+                    <div class="font-extrabold text-slate-900 mb-1">1. Anwesenheit</div>
+                    <p>Abwesende anklicken – sie werden durchgestrichen und bei Ziehungen und Gruppen ignoriert. «Alle da» / «Alle weg» setzt die ganze Klasse auf einmal. Die Anwesenheit bleibt gespeichert, bis du sie änderst.</p>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70">
+                    <div class="font-extrabold text-slate-900 mb-1">2. Gruppen &amp; Tauschen</div>
+                    <p>Auf eine Zahl bei «Max. Teamgrösse» oder «Anzahl Gruppen» klicken – die Gruppen sind sofort gebildet, nochmals klicken mischt neu. Die Gruppen sind höchstens um eine Person unterschiedlich gross, und es gibt nie 1er-Gruppen. Zwei Namen nacheinander anklicken = tauschen.</p>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70">
+                    <div class="font-extrabold text-slate-900 mb-1">Einzelperson ziehen</div>
+                    <p><strong>Zufällig:</strong> jede Ziehung frei, Wiederholungen möglich. <strong>Alle einmal:</strong> jede Person einmal, danach «Alle waren dran», der nächste Klick startet neu. <strong>Endlos:</strong> jede Person einmal, dann sofort die nächste Runde.</p>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70">
+                    <div class="font-extrabold text-slate-900 mb-1">3. Retour</div>
+                    <p>Macht den letzten Schritt rückgängig (Absenz, Ziehung, Gruppen, Tausch, Klasse bearbeiten).</p>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70">
+                    <div class="font-extrabold text-slate-900 mb-1">4. Sicherungen</div>
+                    <p>Unter «Konto»: tägliche automatische Cloud-Sicherung (30 Tage) mit einem Klick wiederherstellbar, dazu Backup-Datei (.json) herunterladen und einspielen. Die App erinnert nach 7 Tagen an eine neue Backup-Datei (gelber Punkt).</p>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 text-emerald-950">
+                    <div class="font-extrabold mb-1">Datenschutz</div>
+                    <p>Klassenlisten liegen in Firestore, Standort Zürich (europe-west6), und sind nur mit deinem Konto lesbar. Bitte nur <strong>Vornamen</strong> erfassen (bei Namensgleichheit z. B. «Mia S.»).</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeModal('helpModal')" class="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold">Verstanden</button>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL: KONTO, SICHERUNGEN & BACKUP                                     -->
+    <!-- ===================================================================== -->
+    <div id="accountModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="text-base font-extrabold text-slate-900">Konto &amp; Sicherungen</h3>
+                <button type="button" onclick="closeModal('accountModal')" class="text-slate-400 hover:text-slate-700 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 text-xs text-emerald-950">
+                <div class="font-extrabold flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    Angemeldet – Sync aktiv (Zürich)
+                </div>
+                <p id="loggedInEmailDisplay" class="font-semibold text-emerald-800 mt-0.5"></p>
+            </div>
+
+            <div class="flex flex-col gap-2.5 text-xs">
+                <div class="font-extrabold text-slate-900 flex items-center gap-1.5"><i data-lucide="history" class="w-4 h-4 text-indigo-600"></i> Sicherungen &amp; Backup</div>
+                <div id="backupStatusBox" class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-[11px] font-semibold leading-relaxed whitespace-pre-line">Lade Sicherungsstand …</div>
+
+                <div class="font-bold text-[11px] text-slate-700 pt-1">Cloud-Sicherungen (automatisch, letzte 30 Tage):</div>
+                <div id="cloudBackupList" class="flex flex-col gap-1 max-h-48 overflow-y-auto text-[11px]"></div>
+                <button type="button" onclick="manualCloudBackup()" class="self-start px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg font-bold text-[11px]">Jetzt Cloud-Sicherung erstellen</button>
+
+                <div class="font-bold text-[11px] text-slate-700 pt-2">Backup-Datei (.json, alle Klassen):</div>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="exportBackupFile()" class="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-bold">
+                        <i data-lucide="download" class="w-3.5 h-3.5"></i> Backup herunterladen
+                    </button>
+                    <label class="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 rounded-lg font-bold cursor-pointer">
+                        <i data-lucide="upload" class="w-3.5 h-3.5"></i> Backup einspielen
+                        <input type="file" accept=".json,application/json" onchange="importBackupFile(event)" class="hidden">
+                    </label>
+                </div>
+                <p class="text-[11px] text-slate-500">Vor jedem Einspielen und jeder Wiederherstellung wird der aktuelle Stand automatisch gesichert.</p>
+            </div>
+
+            <button type="button" onclick="logoutUser()" class="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2">
+                <i data-lucide="log-out" class="w-4 h-4"></i> Abmelden
+            </button>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL: KLASSE ERFASSEN / BEARBEITEN                                    -->
+    <!-- ===================================================================== -->
+    <div id="classEditorModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 flex flex-col gap-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 id="classModalTitle" class="text-base font-extrabold text-slate-900">Neue Klasse erfassen</h3>
+                <button type="button" onclick="closeModal('classEditorModal')" class="text-slate-400 hover:text-slate-700 p-1"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <div class="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-[11px] text-emerald-950">
+                <strong>Nur Vornamen:</strong> pro Zeile ein Name (bei Namensgleichheit z. B. «Luca M.»).
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Klassenname</label>
+                <input type="text" id="classNameInput" placeholder="z. B. 2Ac" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+
+            <div>
+                <div class="flex items-center justify-between mb-1">
+                    <label class="text-xs font-bold text-slate-700">Vornamen (ein Name pro Zeile)</label>
+                    <span id="nameCountPreview" class="text-[11px] font-bold text-indigo-600">0 SuS</span>
+                </div>
+                <textarea id="classNamesTextarea" oninput="validateNamesInput()" rows="7" placeholder="Anna&#10;Ben&#10;Carla&#10;Dario..." class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 leading-relaxed"></textarea>
+                <p id="fullNameWarning" class="hidden text-[11px] font-semibold text-amber-700 mt-1">Hinweis: Bitte Nachnamen auf den Anfangsbuchstaben abkürzen (z. B. «Mia K.»).</p>
+                <p id="duplicateNameWarning" class="hidden text-[11px] font-semibold text-amber-700 mt-1"></p>
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                <button type="button" id="deleteClassBtn" onclick="deleteEditingClass()" class="hidden text-xs font-bold text-rose-600 hover:underline">Klasse löschen</button>
+                <div class="flex gap-2 ml-auto">
+                    <button type="button" onclick="closeModal('classEditorModal')" class="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl">Abbrechen</button>
+                    <button type="button" onclick="saveClassFromModal()" class="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm">Speichern</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg transition-opacity duration-300 opacity-0 pointer-events-none z-[60] flex items-center gap-2">
+        <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
+        <span id="toastMsg">Gespeichert!</span>
+    </div>
+
+    <script>
+        const APP_VERSION = '2.2';
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+        }
+
+        function refreshIcons() {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                try { window.lucide.createIcons(); } catch (e) {}
+            }
+        }
+
+        // =========================================================================
+        // FIREBASE (Projekt «Unterrichtscockpit», Firestore europe-west6 Zürich)
+        // =========================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyBHHhgjAvY0D0trm2IMxauhFp-ssw9ooz4",
+            authDomain: "zufallsgenerator-209f3.firebaseapp.com",
+            projectId: "zufallsgenerator-209f3",
+            storageBucket: "zufallsgenerator-209f3.firebasestorage.app",
+            messagingSenderId: "274439019701",
+            appId: "1:274439019701:web:b90892c5745657e39972fc",
+            measurementId: "G-LSEDXM1GP2"
+        };
+
+        let auth = null;
+        let db = null;
+        try {
+            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+            auth = firebase.auth();
+            db = firebase.firestore();
+        } catch (e) {
+            console.error("Firebase Init Fehler:", e);
+        }
+
+        // Drei Demo-Klassen für den Gast-Modus (reine Fantasienamen)
+        const DEMO_CLASSES = [
+            { id: 'demo-1a', name: 'Demo 1a', names: ["Ada", "Bruno", "Cleo", "Dex", "Elio", "Fenja", "Gino", "Hedda", "Ivo", "Jola",
+                                                       "Kuno", "Lumi", "Milo", "Nala", "Otto", "Pia", "Quirin", "Rhea"] },
+            { id: 'demo-2b', name: 'Demo 2b', names: ["Aurel", "Bela", "Cosmo", "Dalia", "Emil", "Flora", "Gustav", "Hanna", "Ilian", "Juna", "Kian",
+                                                       "Leonie", "Mattia", "Nora", "Oskar", "Paula", "Rafael", "Selma", "Theo", "Uma", "Valentin", "Wanda"] },
+            { id: 'demo-3c', name: 'Demo 3c', names: ["Alva", "Bastian", "Carla", "Dario", "Ella", "Finn", "Greta", "Henri", "Ilvy", "Jonas",
+                                                       "Kira", "Lino", "Mila", "Nevio", "Olivia", "Pablo", "Ronja", "Silas", "Tamara", "Yannick"] }
+        ];
+        function buildDemoClasses() {
+            return DEMO_CLASSES.map(c => ({
+                id: c.id,
+                name: c.name,
+                students: c.names.map((n, i) => ({ id: `${c.id}-${i}`, name: n, present: true, drawn: false }))
+            }));
+        }
+
+        // App-Zustand
+        let currentUser = null;
+        let isGuest = false;
+        let classesData = [];
+        let activeClassId = null;
+        let editingClassId = null;
+        let unsubscribeSnapshot = null;
+        let currentZoom = parseFloat(localStorage.getItem('sekZufallZoom')) || 1.0;
+        let swapSelection = null;
+        let lastGeneratedGroups = [];
+        let isAttendanceOpen = true;
+        let undoStack = [];
+        let lastManualExportAt = '';
+        let drawMode = localStorage.getItem('sekZufallDrawMode') || 'round';   // random | round | endless
+        let roundEndShownFor = null;   // Klasse, bei der «Alle waren dran» gerade angezeigt wird
+        let lastPickedId = {};         // pro Klasse: zuletzt gezogene Person
+        let lastGroupChoice = null;    // {mode, val} der zuletzt gewählten Gruppen-Zahl
+
+        function newId(prefix) {
+            return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        }
+
+        // Doppelte oder fehlende IDs reparieren (z. B. aus älteren Versionen)
+        function normalizeClasses(list) {
+            if (!Array.isArray(list)) return [];
+            const seenCls = new Set();
+            return list.filter(c => c && typeof c.name === 'string').map(c => {
+                let cid = c.id && !seenCls.has(c.id) ? c.id : newId('cls');
+                seenCls.add(cid);
+                const seenSt = new Set();
+                const students = (Array.isArray(c.students) ? c.students : []).filter(s => s && typeof s.name === 'string').map(s => {
+                    let sid = s.id && !seenSt.has(s.id) ? s.id : newId(cid);
+                    seenSt.add(sid);
+                    return { id: sid, name: s.name, present: s.present !== false, drawn: !!s.drawn };
+                });
+                return { id: cid, name: c.name, students };
+            });
+        }
+
+        // =========================================================================
+        // UNDO
+        // =========================================================================
+        function pushUndoSnapshot(label) {
+            undoStack.push({
+                label,
+                classesData: JSON.parse(JSON.stringify(classesData)),
+                activeClassId,
+                lastGeneratedGroups: JSON.parse(JSON.stringify(lastGeneratedGroups)),
+                pickedHtml: document.getElementById('pickedResultBox')?.innerHTML || '',
+                isAttendanceOpen
+            });
+            if (undoStack.length > 25) undoStack.shift();
+            updateUndoButtonState();
+        }
+
+        function updateUndoButtonState() {
+            const btn = document.getElementById('undoBtn');
+            if (!btn) return;
+            if (undoStack.length > 0) {
+                btn.disabled = false;
+                btn.className = "flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 cursor-pointer shadow-sm transition-all";
+                btn.title = `Rückgängig: ${undoStack[undoStack.length - 1].label}`;
+            } else {
+                btn.disabled = true;
+                btn.className = "flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed transition-all";
+                btn.title = "Nichts zum Rückgängigmachen";
+            }
+        }
+
+        function undoLastAction() {
+            if (undoStack.length === 0) return;
+            const prev = undoStack.pop();
+            classesData = prev.classesData;
+            activeClassId = prev.activeClassId;
+            lastGeneratedGroups = prev.lastGeneratedGroups;
+            swapSelection = null;
+            roundEndShownFor = null;
+            updatePickButtonLabel();
+            setAttendancePanelOpen(prev.isAttendanceOpen);
+            document.getElementById('pickedResultBox').innerHTML = prev.pickedHtml || pickedPlaceholder();
+            renderAppContent();
+            renderGroupsGrid();
+            saveClassesToCloud();
+            updateUndoButtonState();
+            showToast(`Rückgängig: ${prev.label}`);
+        }
+
+        // =========================================================================
+        // START & BILDSCHIRME
+        // =========================================================================
+        function showScreen(which) {
+            document.getElementById('loadingScreen').classList.toggle('hidden', which !== 'loading');
+            document.getElementById('loginScreen').classList.toggle('hidden', which !== 'login');
+            document.getElementById('appShell').classList.toggle('hidden', which !== 'app');
+            refreshIcons();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedEmail = localStorage.getItem('sekZufallSavedEmail');
+            if (savedEmail) document.getElementById('authEmailInput').value = savedEmail;
+            document.getElementById('pickedResultBox').innerHTML = pickedPlaceholder();
+            applyZoom();
+            renderDrawModeButtons();
+            updatePickButtonLabel();
+            setAttendancePanelOpen(true);
+            renderGroupsGrid();
+
+            if (!auth) {
+                showScreen('login');
+                showLoginError("Verbindung zu Firebase fehlgeschlagen. Der Gast-Modus funktioniert trotzdem.");
+                return;
+            }
+
+            auth.onAuthStateChanged(async (user) => {
+                if (user) {
+                    isGuest = false;
+                    currentUser = user;
+                    resetWorkspaceState();
+                    setLoggedInUI(user);
+                    showScreen('app');
+                    await connectUserFirestore(user);
+                } else {
+                    currentUser = null;
+                    if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+                    if (!isGuest) {
+                        resetWorkspaceState();
+                        showScreen('login');
+                    }
+                }
+            });
+        });
+
+        function resetWorkspaceState() {
+            classesData = [];
+            activeClassId = null;
+            lastGeneratedGroups = [];
+            swapSelection = null;
+            undoStack = [];
+            updateUndoButtonState();
+            document.getElementById('pickedResultBox').innerHTML = pickedPlaceholder();
+            renderAppContent();
+            renderGroupsGrid();
+        }
+
+        function startGuestMode() {
+            isGuest = true;
+            resetWorkspaceState();
+            classesData = buildDemoClasses();
+            activeClassId = classesData[0].id;
+            document.getElementById('guestBanner').classList.remove('hidden');
+            document.getElementById('syncDot').className = "w-2 h-2 rounded-full bg-amber-400";
+            document.getElementById('syncStatusText').innerText = "Demo-Modus – nichts wird gespeichert";
+            document.getElementById('accountHeaderLabel').innerText = "Login";
+            document.getElementById('backupReminderDot').classList.add('hidden');
+            renderAppContent();
+            showScreen('app');
+        }
+
+        function leaveGuestMode() {
+            isGuest = false;
+            document.getElementById('guestBanner').classList.add('hidden');
+            resetWorkspaceState();
+            showScreen('login');
+        }
+
+        function setLoggedInUI(user) {
+            document.getElementById('guestBanner').classList.add('hidden');
+            document.getElementById('syncDot').className = "w-2 h-2 rounded-full bg-emerald-500";
+            document.getElementById('syncStatusText').innerText = `Sync aktiv (Zürich) • ${user.email}`;
+            document.getElementById('accountHeaderLabel').innerText = "Konto";
+            document.getElementById('loggedInEmailDisplay').innerText = user.email;
+        }
+
+        // =========================================================================
+        // LOGIN
+        // =========================================================================
+        function showLoginError(msg) {
+            const box = document.getElementById('loginErrorBox');
+            box.innerText = msg;
+            box.classList.toggle('hidden', !msg);
+            if (msg) document.getElementById('loginInfoBox').classList.add('hidden');
+        }
+        function showLoginInfo(msg) {
+            const box = document.getElementById('loginInfoBox');
+            box.innerText = msg;
+            box.classList.toggle('hidden', !msg);
+            if (msg) document.getElementById('loginErrorBox').classList.add('hidden');
+        }
+
+        function translateAuthError(err) {
+            const code = err && err.code || '';
+            if (code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found') || code.includes('invalid-login'))
+                return "E-Mail oder Passwort stimmt nicht.";
+            if (code.includes('too-many-requests')) return "Zu viele Versuche. Bitte kurz warten.";
+            if (code.includes('network')) return "Keine Internetverbindung.";
+            if (code.includes('invalid-email')) return "Ungültige E-Mail-Adresse.";
+            return "Anmeldung fehlgeschlagen: " + (err && err.message || code);
+        }
+
+        async function handleLoginSubmit(event) {
+            event.preventDefault();
+            const email = document.getElementById('authEmailInput').value.trim();
+            const pass = document.getElementById('authPasswordInput').value;
+            const remember = document.getElementById('rememberLoginCheck').checked;
+            showLoginError('');
+            if (!email || !pass) { showLoginError("Bitte E-Mail und Passwort eingeben."); return; }
+            if (!auth) { showLoginError("Firebase nicht erreichbar."); return; }
+
+            const btn = document.getElementById('loginSubmitBtn');
+            btn.disabled = true;
+            try {
+                await auth.setPersistence(remember ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION);
+                if (remember) localStorage.setItem('sekZufallSavedEmail', email);
+                else localStorage.removeItem('sekZufallSavedEmail');
+                await auth.signInWithEmailAndPassword(email, pass);
+                document.getElementById('authPasswordInput').value = '';
+                showToast("Erfolgreich angemeldet!");
+            } catch (err) {
+                showLoginError(translateAuthError(err));
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function sendPasswordReset() {
+            const email = document.getElementById('authEmailInput').value.trim();
+            if (!email) { showLoginError("Bitte zuerst die E-Mail-Adresse eingeben."); return; }
+            try {
+                await auth.sendPasswordResetEmail(email);
+                showLoginInfo("Falls ein Konto existiert, wurde eine E-Mail zum Zurücksetzen gesendet.");
+            } catch (err) {
+                showLoginError(translateAuthError(err));
+            }
+        }
+
+        async function logoutUser() {
+            closeModal('accountModal');
+            if (auth) {
+                await auth.signOut();
+                showToast("Abgemeldet.");
+            }
+        }
+
+        // =========================================================================
+        // FIRESTORE: users/{uid}/data/appState  +  users/{uid}/backups/*
+        // =========================================================================
+        function appStateRef() {
+            return db.collection('users').doc(currentUser.uid).collection('data').doc('appState');
+        }
+        function backupsCol() {
+            return db.collection('users').doc(currentUser.uid).collection('backups');
+        }
+
+        async function connectUserFirestore(user) {
+            if (!db) return;
+            const ref = appStateRef();
+            try {
+                const snap = await ref.get();
+                if (!snap.exists) {
+                    await ref.set({ classes: [], updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                }
+            } catch (e) {
+                console.warn("Initial-Check:", e);
+            }
+
+            let firstSnapshot = true;
+            unsubscribeSnapshot = ref.onSnapshot((doc) => {
+                if (!doc.exists || !currentUser || currentUser.uid !== user.uid) return;
+                const data = doc.data();
+                classesData = normalizeClasses(data.classes);
+                if (typeof data.lastManualExportAt === 'string') lastManualExportAt = data.lastManualExportAt;
+                if (classesData.length > 0 && !classesData.some(c => c.id === activeClassId)) {
+                    activeClassId = classesData[0].id;
+                } else if (classesData.length === 0) {
+                    activeClassId = null;
+                }
+                renderAppContent();
+                if (firstSnapshot) {
+                    firstSnapshot = false;
+                    maybeCreateDailyCloudBackup();
+                    refreshBackupReminder();
+                }
+            }, (err) => {
+                console.error("Firestore Sync Fehler:", err);
+                document.getElementById('syncDot').className = "w-2 h-2 rounded-full bg-rose-500";
+                document.getElementById('syncStatusText').innerText = "Sync-Fehler – bitte neu laden";
+            });
+        }
+
+        async function saveClassesToCloud() {
+            if (isGuest || !db || !currentUser) return;
+            try {
+                await appStateRef().set({
+                    classes: classesData,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            } catch (e) {
+                showToast("Cloud-Speicherfehler: " + e.message);
+            }
+        }
+
+        // =========================================================================
+        // SICHERUNGEN: automatisch (Cloud, 30 Tage) + manuell (JSON-Datei)
+        // =========================================================================
+        const CLOUD_BACKUP_DAYS = 30;
+        const MANUAL_REMINDER_DAYS = 7;
+        const BACKUP_LABELS = { 'daily': 'Tägliche Sicherung', 'manual': 'Manuell', 'before-restore': 'Vor Wiederherstellung', 'before-import': 'Vor Import' };
+
+        function todayStr() {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+        function formatDateTime(iso) {
+            if (!iso) return '–';
+            const d = new Date(iso);
+            return d.toLocaleDateString('de-CH') + ' ' + d.toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' });
+        }
+        function countStudents(classes) {
+            return (classes || []).reduce((n, c) => n + (c.students ? c.students.length : 0), 0);
+        }
+
+        async function createCloudBackup(kind) {
+            if (isGuest || !db || !currentUser) return false;
+            const now = new Date();
+            const id = kind === 'daily' ? `daily_${todayStr()}` : `${kind}_${now.getTime()}`;
+            await backupsCol().doc(id).set({
+                kind,
+                createdAt: now.toISOString(),
+                appVersion: APP_VERSION,
+                classes: JSON.parse(JSON.stringify(classesData))
+            });
+            await pruneOldCloudBackups();
+            return true;
+        }
+
+        async function pruneOldCloudBackups() {
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - CLOUD_BACKUP_DAYS);
+            const snap = await backupsCol().get();
+            const old = snap.docs.filter(d => (d.data().createdAt || '') < cutoff.toISOString());
+            await Promise.all(old.map(d => d.ref.delete()));
+        }
+
+        async function maybeCreateDailyCloudBackup() {
+            if (isGuest || !currentUser || classesData.length === 0) return;
+            try {
+                const ref = backupsCol().doc(`daily_${todayStr()}`);
+                const snap = await ref.get();
+                if (!snap.exists) await createCloudBackup('daily');
+            } catch (e) {
+                console.warn("Tägliche Sicherung fehlgeschlagen:", e);
+            }
+        }
+
+        async function manualCloudBackup() {
+            try {
+                await createCloudBackup('manual');
+                showToast("Cloud-Sicherung erstellt.");
+                renderBackupSection();
+            } catch (e) {
+                showToast("Sicherung fehlgeschlagen: " + e.message);
+            }
+        }
+
+        async function renderBackupSection() {
+            const list = document.getElementById('cloudBackupList');
+            const status = document.getElementById('backupStatusBox');
+            list.innerHTML = '<div class="text-slate-400">Lade …</div>';
+            let entries = [];
+            try {
+                const snap = await backupsCol().get();
+                entries = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+            } catch (e) {
+                list.innerHTML = `<div class="text-rose-600">Fehler beim Laden: ${escapeHtml(e.message)}</div>`;
+            }
+
+            const lastCloud = entries[0] ? formatDateTime(entries[0].createdAt) : 'noch keine';
+            const lastFile = lastManualExportAt ? formatDateTime(lastManualExportAt) : 'noch nie';
+            const due = isManualBackupDue();
+            status.className = `border rounded-xl p-3 text-[11px] font-semibold leading-relaxed whitespace-pre-line ${due ? 'bg-amber-50 border-amber-300 text-amber-950' : 'bg-slate-50 border-slate-200 text-slate-700'}`;
+            status.innerText = `Letzte Cloud-Sicherung: ${lastCloud}\nLetzte Backup-Datei: ${lastFile}` +
+                (due ? `\n→ Bitte wieder eine Backup-Datei herunterladen (empfohlen alle ${MANUAL_REMINDER_DAYS} Tage).` : '');
+
+            if (entries.length === 0) {
+                if (!list.querySelector('.text-rose-600')) list.innerHTML = '<div class="text-slate-400">Noch keine Cloud-Sicherung.</div>';
+                return;
+            }
+            list.innerHTML = entries.map(e => `
+                <div class="flex items-center justify-between gap-2 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5">
+                    <span><strong>${escapeHtml(formatDateTime(e.createdAt))}</strong> · ${escapeHtml(BACKUP_LABELS[e.kind] || e.kind)} · ${(e.classes || []).length} Kl. / ${countStudents(e.classes)} SuS</span>
+                    <button type="button" onclick="restoreCloudBackup('${escapeHtml(e.id)}')" class="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold text-[10.5px] shrink-0">Wiederherstellen</button>
+                </div>
+            `).join('');
+        }
+
+        async function restoreCloudBackup(id) {
+            try {
+                const snap = await backupsCol().doc(id).get();
+                if (!snap.exists) { showToast("Sicherung nicht gefunden."); return; }
+                const data = snap.data();
+                if (!confirm(`Sicherung vom ${formatDateTime(data.createdAt)} wiederherstellen?\n\n${(data.classes || []).length} Klassen / ${countStudents(data.classes)} SuS.\nDer aktuelle Stand wird vorher automatisch gesichert.`)) return;
+                await createCloudBackup('before-restore');
+                applyRestoredClasses(data.classes, 'Wiederhergestellt');
+                renderBackupSection();
+            } catch (e) {
+                showToast("Wiederherstellung fehlgeschlagen: " + e.message);
+            }
+        }
+
+        function applyRestoredClasses(classes, label) {
+            pushUndoSnapshot(label);
+            classesData = normalizeClasses(classes);
+            activeClassId = classesData.length ? classesData[0].id : null;
+            lastGeneratedGroups = [];
+            swapSelection = null;
+            document.getElementById('pickedResultBox').innerHTML = pickedPlaceholder();
+            renderAppContent();
+            renderGroupsGrid();
+            saveClassesToCloud();
+            showToast(`${label}: ${classesData.length} Klassen.`);
+        }
+
+        function exportBackupFile() {
+            const payload = {
+                app: 'sek-zufall',
+                appVersion: APP_VERSION,
+                exportedAt: new Date().toISOString(),
+                account: currentUser ? currentUser.email : null,
+                classes: classesData
+            };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `zufallsgenerator-backup-${todayStr()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+
+            lastManualExportAt = new Date().toISOString();
+            localStorage.setItem('sekZufallLastManualExport', lastManualExportAt);
+            if (currentUser && db) appStateRef().set({ lastManualExportAt }, { merge: true }).catch(() => {});
+            refreshBackupReminder();
+            renderBackupSection();
+            showToast("Backup-Datei heruntergeladen.");
+        }
+
+        async function importBackupFile(event) {
+            const file = event.target.files && event.target.files[0];
+            event.target.value = '';
+            if (!file) return;
+            let data;
+            try {
+                data = JSON.parse(await file.text());
+            } catch (e) {
+                showToast("Datei ist kein gültiges JSON.");
+                return;
+            }
+            const classes = Array.isArray(data) ? data : data && data.classes;
+            const normalized = normalizeClasses(classes);
+            if (normalized.length === 0) { showToast("Keine Klassen in der Datei gefunden."); return; }
+            if (!confirm(`Backup-Datei «${file.name}» einspielen?\n\n${normalized.length} Klassen / ${countStudents(normalized)} SuS.\nDer aktuelle Stand wird ersetzt und vorher automatisch gesichert.`)) return;
+
+            let secured = false;
+            try { secured = await createCloudBackup('before-import'); } catch (e) { secured = false; }
+            if (!secured) {
+                if (!confirm("Die Cloud-Sicherung vor dem Import hat nicht geklappt.\n\nOK = zuerst Backup-Datei des aktuellen Stands herunterladen, dann importieren\nAbbrechen = Import abbrechen")) return;
+                exportBackupFile();
+            }
+            applyRestoredClasses(normalized, 'Backup eingespielt');
+            renderBackupSection();
+        }
+
+        function isManualBackupDue() {
+            const last = lastManualExportAt || localStorage.getItem('sekZufallLastManualExport') || '';
+            if (!last) return true;
+            return (Date.now() - new Date(last).getTime()) > MANUAL_REMINDER_DAYS * 86400000;
+        }
+
+        function refreshBackupReminder() {
+            const dot = document.getElementById('backupReminderDot');
+            dot.classList.toggle('hidden', isGuest || !currentUser || classesData.length === 0 || !isManualBackupDue());
+        }
+
+        // =========================================================================
+        // ANWESENHEIT EIN-/AUSBLENDEN & MODUS
+        // =========================================================================
+        function toggleAttendancePanel() {
+            setAttendancePanelOpen(!isAttendanceOpen);
+        }
+
+        function setAttendancePanelOpen(open) {
+            isAttendanceOpen = open;
+            document.getElementById('attendanceBody').classList.toggle('hidden', !open);
+            document.getElementById('toggleAttendanceLabel').innerText = open ? "Ausblenden" : "Anwesenheit zeigen";
+            document.getElementById('toggleAttendanceChevron').innerHTML = `<i data-lucide="${open ? 'chevron-up' : 'chevron-down'}" class="w-3.5 h-3.5"></i>`;
+            document.getElementById('attendanceCollapseHint').innerText = open
+                ? "Klicke auf einen Namen, um An-/Abwesenheit zu wechseln"
+                : "Ausgeblendet für maximale Gruppen-Ansicht – Klicken zum Öffnen";
+            refreshIcons();
+        }
+
+        function switchGeneratorMode(mode) {
+            const single = mode === 'single';
+            document.getElementById('singleModePanel').classList.toggle('hidden', !single);
+            document.getElementById('groupsModePanel').classList.toggle('hidden', single);
+            document.getElementById('drawModeWrapper').classList.toggle('hidden', !single);
+            const on = "px-4 py-2 rounded-lg bg-white text-slate-900 shadow-sm transition-all";
+            const off = "px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all";
+            document.getElementById('modeTabSingle').className = single ? on : off;
+            document.getElementById('modeTabGroups').className = single ? off : on;
+        }
+
+        // =========================================================================
+        // MODALS
+        // =========================================================================
+        function openHelpModal() {
+            document.getElementById('helpModal').classList.remove('hidden');
+            refreshIcons();
+        }
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+        function openAccountModal() {
+            if (isGuest) { leaveGuestMode(); return; }
+            document.getElementById('accountModal').classList.remove('hidden');
+            renderBackupSection();
+            refreshIcons();
+        }
+
+        // =========================================================================
+        // RENDERING & INTERAKTIONEN
+        // =========================================================================
+        function pickedPlaceholder(text) {
+            return `<span class="text-xs font-semibold text-slate-400">${escapeHtml(text || 'Klicke unten auf «Zufällige Person ziehen», um zu starten')}</span>`;
+        }
+
+        function renderAppContent() {
+            const tabs = document.getElementById('classTabsContainer');
+            const emptyState = document.getElementById('emptyClassesState');
+            const workspace = document.getElementById('workspaceContainer');
+            const editBtn = document.getElementById('editClassBtn');
+
+            tabs.innerHTML = '';
+            refreshBackupReminder();
+
+            if (classesData.length === 0) {
+                emptyState.classList.remove('hidden');
+                workspace.classList.add('hidden');
+                editBtn.classList.add('hidden');
+                refreshIcons();
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            workspace.classList.remove('hidden');
+            editBtn.classList.remove('hidden');
+
+            classesData.forEach(cls => {
+                const isActive = cls.id === activeClassId;
+                const btn = document.createElement('button');
+                btn.type = "button";
+                btn.onclick = () => selectClass(cls.id);
+                btn.className = isActive
+                    ? "px-4 py-1.5 rounded-xl text-xs font-extrabold bg-indigo-600 text-white shadow-sm transition-all"
+                    : "px-4 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all";
+                btn.innerText = `${cls.name} (${cls.students.length})`;
+                tabs.appendChild(btn);
+            });
+
+            const activeCls = classesData.find(c => c.id === activeClassId);
+            if (!activeCls) return;
+
+            document.getElementById('activeClassTitle').innerText = `Anwesenheit – Klasse ${activeCls.name}`;
+            const presentCount = activeCls.students.filter(s => s.present).length;
+            document.getElementById('attendanceBadge').innerText = `${presentCount} / ${activeCls.students.length} anwesend`;
+
+            const list = document.getElementById('studentsChecklist');
+            list.innerHTML = '';
+            activeCls.students.forEach(st => {
+                const chip = document.createElement('button');
+                chip.type = "button";
+                chip.onclick = () => toggleStudentPresence(st.id);
+                let style = "bg-slate-50/90 border-slate-200/90 text-slate-800 hover:border-indigo-300 hover:bg-white";
+                if (!st.present) style = "bg-rose-50/70 border-rose-200 text-rose-400 line-through opacity-75";
+                else if (st.drawn) style = "bg-emerald-50/80 border-emerald-200 text-emerald-800";
+                chip.className = `${style} border rounded-xl px-3 py-2 text-left text-xs font-bold flex items-center justify-between transition-all`;
+                chip.innerHTML = `
+                    <span class="truncate">${escapeHtml(st.name)}</span>
+                    ${!st.present
+                        ? `<span class="text-[10px] font-semibold text-rose-500">abw.</span>`
+                        : (st.drawn ? `<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>` : '')}
+                `;
+                list.appendChild(chip);
+            });
+            renderGroupButtons();
+            refreshIcons();
+        }
+
+        function selectClass(id) {
+            if (id === activeClassId) return;
+            activeClassId = id;
+            swapSelection = null;
+            lastGeneratedGroups = [];
+            lastGroupChoice = null;
+            roundEndShownFor = null;
+            updatePickButtonLabel();
+            document.getElementById('pickedResultBox').innerHTML = pickedPlaceholder();
+            setAttendancePanelOpen(true);
+            renderAppContent();
+            renderGroupsGrid();
+        }
+
+        function getActiveClass() {
+            return classesData.find(c => c.id === activeClassId);
+        }
+
+        function toggleStudentPresence(studentId) {
+            const cls = getActiveClass();
+            if (!cls) return;
+            const st = cls.students.find(s => s.id === studentId);
+            if (!st) return;
+            pushUndoSnapshot(`Anwesenheit (${st.name})`);
+            st.present = !st.present;
+            renderAppContent();
+            saveClassesToCloud();
+        }
+
+        function setAllPresent(val) {
+            const cls = getActiveClass();
+            if (!cls) return;
+            pushUndoSnapshot(val ? "Alle anwesend" : "Alle abwesend");
+            cls.students.forEach(s => s.present = val);
+            renderAppContent();
+            saveClassesToCloud();
+        }
+
+        function resetDrawnHistory() {
+            const cls = getActiveClass();
+            if (!cls) return;
+            pushUndoSnapshot("Runde zurückgesetzt");
+            cls.students.forEach(s => s.drawn = false);
+            roundEndShownFor = null;
+            updatePickButtonLabel();
+            document.getElementById('pickedResultBox').innerHTML = pickedPlaceholder('Runde zurückgesetzt');
+            renderAppContent();
+            saveClassesToCloud();
+        }
+
+        function openNewClassModal() {
+            editingClassId = null;
+            document.getElementById('classModalTitle').innerText = "Neue Klasse erfassen";
+            document.getElementById('classNameInput').value = "";
+            document.getElementById('classNamesTextarea').value = "";
+            document.getElementById('deleteClassBtn').classList.add('hidden');
+            validateNamesInput();
+            document.getElementById('classEditorModal').classList.remove('hidden');
+            refreshIcons();
+        }
+
+        function openEditClassModal() {
+            const cls = getActiveClass();
+            if (!cls) return;
+            editingClassId = cls.id;
+            document.getElementById('classModalTitle').innerText = `Klasse ${cls.name} bearbeiten`;
+            document.getElementById('classNameInput').value = cls.name;
+            document.getElementById('classNamesTextarea').value = cls.students.map(s => s.name).join('\n');
+            document.getElementById('deleteClassBtn').classList.remove('hidden');
+            validateNamesInput();
+            document.getElementById('classEditorModal').classList.remove('hidden');
+            refreshIcons();
+        }
+
+        function parseRawNames(raw) {
+            return raw.split(/[\n,;]+/).map(n => n.trim().replace(/\s+/g, ' ')).filter(n => n.length > 0);
+        }
+
+        function validateNamesInput() {
+            const names = parseRawNames(document.getElementById('classNamesTextarea').value);
+            document.getElementById('nameCountPreview').innerText = `${names.length} SuS`;
+            const hasFullLastName = names.some(n => /^[A-ZÄÖÜ][a-zäöüß]+\s+[A-ZÄÖÜ][a-zäöüß]{2,}$/.test(n));
+            document.getElementById('fullNameWarning').classList.toggle('hidden', !hasFullLastName);
+
+            const counts = {};
+            names.forEach(n => counts[n] = (counts[n] || 0) + 1);
+            const dups = Object.keys(counts).filter(n => counts[n] > 1);
+            const dupEl = document.getElementById('duplicateNameWarning');
+            dupEl.classList.toggle('hidden', dups.length === 0);
+            dupEl.innerText = dups.length ? `Doppelt: ${dups.join(', ')} – zur Unterscheidung z. B. «${dups[0]} S.» schreiben.` : '';
+        }
+
+        async function saveClassFromModal() {
+            const nameVal = document.getElementById('classNameInput').value.trim();
+            const parsedNames = parseRawNames(document.getElementById('classNamesTextarea').value);
+            if (!nameVal || parsedNames.length === 0) {
+                showToast("Bitte Klassenname und mindestens einen Vornamen eingeben.");
+                return;
+            }
+
+            pushUndoSnapshot(`Klasse ${nameVal} gespeichert`);
+
+            if (editingClassId) {
+                const cls = classesData.find(c => c.id === editingClassId);
+                if (cls) {
+                    cls.name = nameVal;
+                    // Pro Name eine Warteschlange: gleiche Namen bleiben getrennte Personen
+                    const pool = new Map();
+                    cls.students.forEach(s => {
+                        if (!pool.has(s.name)) pool.set(s.name, []);
+                        pool.get(s.name).push(s);
+                    });
+                    cls.students = parsedNames.map(n => {
+                        const queue = pool.get(n);
+                        if (queue && queue.length) return queue.shift();
+                        return { id: newId(cls.id), name: n, present: true, drawn: false };
+                    });
+                    lastGeneratedGroups = [];
+                    renderGroupsGrid();
+                }
+            } else {
+                const newClsId = newId('cls');
+                classesData.push({
+                    id: newClsId,
+                    name: nameVal,
+                    students: parsedNames.map(n => ({ id: newId(newClsId), name: n, present: true, drawn: false }))
+                });
+                activeClassId = newClsId;
+                lastGeneratedGroups = [];
+                document.getElementById('pickedResultBox').innerHTML = pickedPlaceholder();
+                renderGroupsGrid();
+            }
+
+            setAttendancePanelOpen(true);
+            closeModal('classEditorModal');
+            renderAppContent();
+            await saveClassesToCloud();
+            showToast(isGuest ? `Klasse ${nameVal} erstellt (Demo, nicht gespeichert).` : `Klasse ${nameVal} gespeichert!`);
+        }
+
+        async function deleteEditingClass() {
+            if (!editingClassId) return;
+            const cls = classesData.find(c => c.id === editingClassId);
+            if (!cls || !confirm(`Klasse ${cls.name} wirklich löschen?\n(Mit «Retour» rückgängig machbar.)`)) return;
+            pushUndoSnapshot("Klasse gelöscht");
+            classesData = classesData.filter(c => c.id !== editingClassId);
+            activeClassId = classesData.length > 0 ? classesData[0].id : null;
+            lastGeneratedGroups = [];
+            document.getElementById('pickedResultBox').innerHTML = pickedPlaceholder();
+            closeModal('classEditorModal');
+            renderAppContent();
+            renderGroupsGrid();
+            await saveClassesToCloud();
+            showToast("Klasse gelöscht.");
+        }
+
+        // =========================================================================
+        // ZUFALLSZIEHUNG & GRUPPENBILDUNG
+        // =========================================================================
+        function randomInt(max) {
+            if (window.crypto && crypto.getRandomValues) {
+                const buf = new Uint32Array(1);
+                const limit = Math.floor(0x100000000 / max) * max;
+                do { crypto.getRandomValues(buf); } while (buf[0] >= limit);
+                return buf[0] % max;
+            }
+            return Math.floor(Math.random() * max);
+        }
+
+        // ---------- Ziehmodus ----------
+        function setDrawMode(mode) {
+            drawMode = mode;
+            localStorage.setItem('sekZufallDrawMode', mode);
+            roundEndShownFor = null;
+            renderDrawModeButtons();
+            updatePickButtonLabel();
+        }
+
+        function renderDrawModeButtons() {
+            document.querySelectorAll('.draw-mode-btn').forEach(b => {
+                const on = b.dataset.drawmode === drawMode;
+                b.className = 'draw-mode-btn px-3 py-2 rounded-l-xl border transition-colors ' +
+                    (on ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50');
+                const tipBtn = b.nextElementSibling;
+                tipBtn.className = 'tip-btn px-2 py-2 rounded-r-xl border border-l-0 transition-colors ' +
+                    (on ? 'bg-indigo-500 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-400 hover:text-indigo-600');
+            });
+        }
+
+        function toggleTip(event, id) {
+            event.stopPropagation();
+            document.querySelectorAll('.tip').forEach(t => t.classList.toggle('hidden', t.id !== id));
+        }
+        document.addEventListener('click', () => document.querySelectorAll('.tip').forEach(t => t.classList.add('hidden')));
+        document.addEventListener('mouseover', (e) => {
+            const btn = e.target.closest && e.target.closest('.tip-btn');
+            document.querySelectorAll('.tip').forEach(t => {
+                if (btn && btn.nextElementSibling === t) t.classList.remove('hidden');
+                else if (btn) t.classList.add('hidden');
+            });
+        });
+
+        function updatePickButtonLabel() {
+            const label = document.querySelector('#pickBtn span');
+            if (!label) return;
+            label.innerText = (drawMode === 'round' && roundEndShownFor === activeClassId) ? 'Neue Runde starten' : 'Zufällige Person ziehen';
+        }
+
+        function roundProgressText(cls) {
+            if (drawMode === 'random') return '';
+            const present = cls.students.filter(s => s.present);
+            const done = present.filter(s => s.drawn).length;
+            return `${done} von ${present.length} waren dran`;
+        }
+
+        function showPicked(cls, name) {
+            const progress = roundProgressText(cls);
+            document.getElementById('pickedResultBox').innerHTML = `
+                <span class="text-[11px] font-bold uppercase tracking-widest text-indigo-600 mb-1.5">Ausgewählt</span>
+                <div class="text-[2.4rem] leading-tight font-black text-slate-900 tracking-tight animate-reveal">${escapeHtml(name)}</div>
+                ${progress ? `<span class="mt-2 text-[11px] font-semibold text-slate-400">${progress}</span>` : ''}
+            `;
+        }
+
+        function pickRandomStudent() {
+            const cls = getActiveClass();
+            if (!cls) return;
+            const present = cls.students.filter(s => s.present);
+            if (present.length === 0) { showToast("Niemand als anwesend markiert!"); return; }
+
+            let pool;
+            if (drawMode === 'random') {
+                pool = present;
+                pushUndoSnapshot("Einzelziehung");
+            } else {
+                pool = present.filter(s => !s.drawn);
+                if (pool.length === 0) {
+                    // «Alle einmal»: zuerst eine Schluss-Anzeige, erst der nächste Klick startet neu
+                    if (drawMode === 'round' && roundEndShownFor !== cls.id) {
+                        roundEndShownFor = cls.id;
+                        document.getElementById('pickedResultBox').innerHTML = `
+                            <div class="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2"><i data-lucide="check" class="w-6 h-6"></i></div>
+                            <div class="text-2xl font-black text-slate-900 animate-reveal">Alle waren dran!</div>
+                            <span class="mt-1.5 text-xs font-semibold text-slate-500">${present.length} von ${present.length} – nächster Klick startet eine neue Runde</span>
+                        `;
+                        refreshIcons();
+                        updatePickButtonLabel();
+                        return;
+                    }
+                    pushUndoSnapshot("Neue Runde");
+                    present.forEach(s => s.drawn = false);
+                    pool = present.slice();
+                    // Endlos: die zuletzt gezogene Person nicht gleich wieder als erste
+                    if (pool.length > 1 && lastPickedId[cls.id]) pool = pool.filter(s => s.id !== lastPickedId[cls.id]);
+                    if (drawMode === 'endless') showToast("Alle waren dran – neue Runde!");
+                } else {
+                    pushUndoSnapshot("Einzelziehung");
+                }
+            }
+            roundEndShownFor = null;
+
+            const chosen = pool[randomInt(pool.length)];
+            chosen.drawn = true;
+            lastPickedId[cls.id] = chosen.id;
+            showPicked(cls, chosen.name);
+            updatePickButtonLabel();
+            renderAppContent();
+            saveClassesToCloud();
+        }
+
+        // Gruppenanzahl so wählen, dass nie eine 1er-Gruppe entsteht
+        function computeGroupCount(n, mode, val) {
+            const maxGroups = Math.floor(n / 2); // jede Gruppe mind. 2 Personen
+            if (maxGroups < 1) return 1;
+            const wanted = mode === 'numGroups' ? val : Math.ceil(n / val);
+            return Math.max(1, Math.min(wanted, maxGroups));
+        }
+
+        function chooseGroups(mode, val) {
+            lastGroupChoice = { mode, val };
+            generateGroups();
+            renderGroupButtons();
+        }
+
+        function renderGroupButtons() {
+            const cls = getActiveClass();
+            const n = cls ? cls.students.filter(s => s.present).length : 0;
+            const btn = (mode, v) => {
+                const on = lastGroupChoice && lastGroupChoice.mode === mode && lastGroupChoice.val === v;
+                return `<button type="button" onclick="chooseGroups('${mode}', ${v})" class="w-9 h-9 rounded-xl text-sm font-extrabold border transition-colors ${on ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white border-slate-200 text-slate-700 hover:bg-indigo-50 hover:border-indigo-300'}">${v}</button>`;
+            };
+            const sizes = [2, 3, 4, 5, 6, 7, 8];
+            const maxGroups = Math.floor(n / 2);
+            const counts = [];
+            for (let g = 2; g <= maxGroups; g++) counts.push(g);
+            document.getElementById('teamSizeButtons').innerHTML = n >= 2 ? sizes.map(v => btn('maxSize', v)).join('') : '<span class="text-slate-400">mind. 2 Anwesende nötig</span>';
+            document.getElementById('groupCountButtons').innerHTML = counts.length ? counts.map(v => btn('numGroups', v)).join('') : '<span class="text-slate-400">mind. 4 Anwesende nötig</span>';
+        }
+
+        function generateGroups() {
+            const cls = getActiveClass();
+            if (!cls) return;
+            const present = cls.students.filter(s => s.present).map(s => s.name);
+            if (present.length < 2) { showToast("Mindestens 2 anwesende Personen nötig."); return; }
+
+            pushUndoSnapshot("Gruppen gemischt");
+
+            const shuffled = [...present];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = randomInt(i + 1);
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+
+            if (!lastGroupChoice) return;
+            const mode = lastGroupChoice.mode;
+            const val = lastGroupChoice.val;
+            const numGroups = computeGroupCount(shuffled.length, mode, val);
+
+            const groups = Array.from({ length: numGroups }, () => []);
+            shuffled.forEach((name, idx) => groups[idx % numGroups].push(name));
+
+            // Hinweis, wenn die Vorgabe nicht exakt erfüllbar war
+            const info = document.getElementById('groupsInfoLine');
+            const maxSize = Math.max(...groups.map(g => g.length));
+            let note = '';
+            if (mode === 'maxSize' && maxSize > val) note = `Hinweis: ${shuffled.length} Anwesende gehen mit max. ${val} nicht ohne 1er-Gruppe auf – deshalb ist mindestens eine Gruppe grösser.`;
+            if (mode === 'numGroups' && numGroups < val) note = `Hinweis: Mit ${shuffled.length} Anwesenden sind höchstens ${numGroups} Gruppen ohne 1er-Gruppe möglich.`;
+            info.innerText = note;
+            info.classList.toggle('hidden', !note);
+
+            lastGeneratedGroups = groups;
+            swapSelection = null;
+            setAttendancePanelOpen(false);
+            renderGroupsGrid();
+        }
+
+        function renderGroupsGrid() {
+            const grid = document.getElementById('groupsResultGrid');
+            if (!grid) return;
+            if (!lastGeneratedGroups || lastGeneratedGroups.length === 0) {
+                document.getElementById('groupsInfoLine').classList.add('hidden');
+                grid.innerHTML = `<div class="col-span-full py-10 text-center text-xs text-slate-400 italic">Auf eine Zahl klicken – die Gruppen werden sofort gebildet.</div>`;
+                return;
+            }
+            grid.innerHTML = '';
+            lastGeneratedGroups.forEach((members, gIdx) => {
+                const card = document.createElement('div');
+                card.className = "bg-slate-50 border border-slate-200/90 rounded-2xl p-4 flex flex-col gap-2.5 animate-reveal shadow-sm";
+                card.innerHTML = `
+                    <div class="flex items-center justify-between border-b border-slate-200/80 pb-2">
+                        <span class="text-sm font-extrabold text-indigo-700">Team ${gIdx + 1}</span>
+                        <span class="text-xs font-bold text-slate-400">${members.length} SuS</span>
+                    </div>
+                    <div class="flex flex-col gap-1.5">
+                        ${members.map((m, mIdx) => {
+                            const isSelected = swapSelection && swapSelection.gIdx === gIdx && swapSelection.mIdx === mIdx;
+                            return `<button type="button" onclick="handleSwapClick(${gIdx}, ${mIdx})" class="text-[0.95rem] text-left px-3 py-2 rounded-xl font-bold transition-colors ${isSelected ? 'bg-amber-200 text-amber-950 ring-2 ring-amber-500' : 'bg-white hover:bg-indigo-50 text-slate-800 border border-slate-200/70'}">${escapeHtml(m)}</button>`;
+                        }).join('')}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function handleSwapClick(gIdx, mIdx) {
+            if (!swapSelection) {
+                swapSelection = { gIdx, mIdx };
+                renderGroupsGrid();
+                return;
+            }
+            if (swapSelection.gIdx === gIdx && swapSelection.mIdx === mIdx) {
+                swapSelection = null;
+                renderGroupsGrid();
+                return;
+            }
+            pushUndoSnapshot("Namen getauscht");
+            const first = lastGeneratedGroups[swapSelection.gIdx][swapSelection.mIdx];
+            lastGeneratedGroups[swapSelection.gIdx][swapSelection.mIdx] = lastGeneratedGroups[gIdx][mIdx];
+            lastGeneratedGroups[gIdx][mIdx] = first;
+            swapSelection = null;
+            renderGroupsGrid();
+            showToast("Getauscht!");
+        }
+
+        // =========================================================================
+        // ZOOM (wirkt auf den ganzen Arbeitsbereich)
+        // =========================================================================
+        function applyZoom() {
+            document.getElementById('mainArea').style.zoom = currentZoom;
+            document.getElementById('zoomLabel').innerText = `${Math.round(currentZoom * 100)}%`;
+            localStorage.setItem('sekZufallZoom', String(currentZoom));
+        }
+        function adjustZoom(delta) {
+            currentZoom = Math.round(Math.min(1.6, Math.max(0.8, currentZoom + delta)) * 10) / 10;
+            applyZoom();
+        }
+        function resetZoom() {
+            currentZoom = 1.0;
+            applyZoom();
+        }
+
+        // =========================================================================
+        // HILFSFUNKTIONEN
+        // =========================================================================
+        function escapeHtml(str) {
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+        let toastTimer = null;
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            t.classList.remove('opacity-0');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => t.classList.add('opacity-0'), 2800);
+        }
+    </script>
+</body>
+</html>
