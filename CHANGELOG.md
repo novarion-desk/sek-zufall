@@ -1,5 +1,8 @@
 # Changelog
 
+## Version 2.5 – 21.11.2026
+- Neu: Zurück-Geste / Zurück-Taste schliesst offene Fenster (Hilfe, Konto, Klasse bearbeiten) statt die App zu schliessen.
+
 ## Version 2.4 – 21.11.2026
 - Neuer Knopf «Feedback» in der Kopfzeile: öffnet ein anonymes Formular für Fehler, Inhaltsfehler und Wünsche. Version und Gerät werden automatisch mitgegeben; es werden keine Namen abgefragt.
 

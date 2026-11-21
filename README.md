@@ -13,6 +13,7 @@ Live-App: https://novarion-desk.github.io/sek-zufall/
 
 ## Zu einer älteren Version zurück
 
+- Version 2.5: https://novarion-desk.github.io/sek-zufall/versions/v2.5/
 - Version 2.4: https://novarion-desk.github.io/sek-zufall/versions/v2.4/
 - Version 2.3: https://novarion-desk.github.io/sek-zufall/versions/v2.3/
 - Version 2.2: https://novarion-desk.github.io/sek-zufall/versions/v2.2/
