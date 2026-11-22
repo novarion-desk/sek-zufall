@@ -506,7 +506,7 @@
     </div>
 
     <script>
-        const APP_VERSION = '2.6';
+        const APP_VERSION = '2.7';
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
@@ -1601,6 +1601,22 @@
 <script>
 /* Feedback: öffnet das anonyme Tally-Formular (App, Version und Gerät werden mitgegeben, keine Personendaten) */
 
+window.CAST_CFG = {
+    bottom: 12,
+    mirror: () => ({ html: document.getElementById('mainArea').innerHTML, dark: false }),
+    sep: () => {
+        const vis = id => { const e = document.getElementById(id); return e && !e.classList.contains('hidden'); };
+        let h = null;
+        if (vis('toolsModePanel')) h = beamerContent('timer');
+        else if (vis('groupsModePanel')) h = beamerContent('groups') || '<div style="font-size:2rem;font-weight:800;opacity:.7">Noch keine Gruppen</div>';
+        else {
+            const t = (document.getElementById('pickedResultBox').innerText || '').split('\n').map(x => x.trim()).filter(Boolean)[0] || '';
+            h = '<div style="font-size:min(12vw,18vh);font-weight:900;text-align:center;line-height:1.1">' + escapeHtml(t) + '</div>';
+        }
+        return { html: h, dark: true };
+    }
+};
+
 /* ===== Version 2.6: Regeln, Rollen, Speichern, Export, Beamer, Werkzeuge ===== */
 const DEFAULT_ROLES = ['Moderation', 'Zeit', 'Schreiben', 'Präsentation'];
 function rolesEnabled() { try { return localStorage.getItem('sekZufallRolesOn') === '1'; } catch (e) { return false; } }
@@ -1789,20 +1805,26 @@ function printGroups() {
 
 /* Beamer-Ansicht */
 let beamerKind = null;
-function openBeamer(kind) {
-    beamerKind = kind;
-    const body = document.getElementById('beamerBody');
+function beamerContent(kind) {
     if (kind === 'groups') {
         const g = lastGeneratedGroups;
-        if (!g.length) return;
+        if (!g.length) return null;
         const cols = g.length <= 2 ? g.length : g.length <= 6 ? 3 : 4;
         const fs = g.length <= 4 ? '2.6rem' : g.length <= 8 ? '2rem' : '1.6rem';
-        body.innerHTML = `<div class="w-full grid gap-5" style="grid-template-columns:repeat(${cols},minmax(0,1fr))">` + g.map((m, gi) =>
+        return `<div class="w-full grid gap-5" style="grid-template-columns:repeat(${cols},minmax(0,1fr))">` + g.map((m, gi) =>
             `<div class="rounded-3xl bg-white/10 p-6"><div class="font-black text-amber-300 mb-3" style="font-size:calc(${fs}*0.8)">Team ${gi + 1}</div>` +
             m.map((n, mi) => `<div class="font-extrabold leading-tight py-1" style="font-size:${fs}">${escapeHtml(n)}${(lastGroupRoles[gi] && lastGroupRoles[gi][mi]) ? ` <span class="text-indigo-300 font-bold" style="font-size:calc(${fs}*0.55)">${escapeHtml(lastGroupRoles[gi][mi])}</span>` : ''}</div>`).join('') + '</div>').join('') + '</div>';
     } else if (kind === 'timer') {
-        body.innerHTML = '<div id="beamerTimer" class="font-black tabular-nums" style="font-size:min(28vw,34vh)">' + timerText() + '</div><div class="flex gap-4 mt-8"><button type="button" onclick="timerToggle()" id="beamerTimerBtn" class="px-10 py-5 rounded-2xl bg-indigo-600 text-3xl font-extrabold">' + (T.running ? 'Pause' : 'Start') + '</button><button type="button" onclick="timerReset()" class="px-8 py-5 rounded-2xl bg-white/15 text-3xl font-extrabold">Zurück</button></div>';
+        return '<div id="beamerTimer" class="font-black tabular-nums" style="font-size:min(28vw,34vh)">' + timerText() + '</div><div class="flex gap-4 mt-8"><button type="button" onclick="timerToggle()" id="beamerTimerBtn" class="px-10 py-5 rounded-2xl bg-indigo-600 text-3xl font-extrabold">' + (T.running ? 'Pause' : 'Start') + '</button><button type="button" onclick="timerReset()" class="px-8 py-5 rounded-2xl bg-white/15 text-3xl font-extrabold">Zurück</button></div>';
     }
+    return null;
+}
+function openBeamer(kind) {
+    const body = document.getElementById('beamerBody');
+    const html = beamerContent(kind);
+    if (html === null) return;
+    beamerKind = kind;
+    body.innerHTML = html;
     document.getElementById('beamerOverlay').classList.remove('hidden');
     const el = document.documentElement;
     try { if (el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen().catch(() => {}); } catch (e) {}
@@ -1879,7 +1901,7 @@ function timerBeep() {
     showToast('Zeit ist um!');
 }
 
-function openAppFeedback(){var q=new URLSearchParams({app:'sekzufall',version:'2.6',geraet:(navigator.userAgent||'').slice(0,120)});window.open('https://tally.so/r/GeR9re?'+q.toString(),'_blank','noopener');}
+function openAppFeedback(){var q=new URLSearchParams({app:'sekzufall',version:'2.7',geraet:(navigator.userAgent||'').slice(0,120)});window.open('https://tally.so/r/GeR9re?'+q.toString(),'_blank','noopener');}
 
 /* ===== Zurück-Geste (Handy): ein Schritt zurück statt App schliessen ===== */
 (function(){
@@ -1898,6 +1920,111 @@ function openAppFeedback(){var q=new URLSearchParams({app:'sekzufall',version:'2
   if(depth){depth=0;goBack();sched()}
  });
 })();
+/* ===== Auf Bildschirm senden (Cast / zweites Fenster) – Getrennt oder Gleich ===== */
+(function () {
+  const P = new URLSearchParams(location.search);
+  const CHN = 'cast-' + location.pathname;
+  let bc = null;
+  try { bc = new BroadcastChannel(CHN); } catch (e) {}
+
+  /* Empfänger: zeigt nur noch, was die Lehrperson schickt */
+  if (P.get('cast') === '1') {
+    const box = document.createElement('div');
+    box.style.cssText = 'position:fixed;inset:0;z-index:2147483000;overflow:auto;pointer-events:none;background:#0f172a;color:#fff;font-family:Inter,system-ui,sans-serif';
+    box.innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:800;opacity:.7">Warte auf die Lehrperson …</div>';
+    document.body.appendChild(box);
+    const show = m => {
+      if (!m || typeof m !== 'object') return;
+      if (m.bye) { box.innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:800;opacity:.7">Beendet</div>'; box.style.background = '#0f172a'; box.style.color = '#fff'; return; }
+      box.style.background = m.dark ? '#0f172a' : '#f8fafc';
+      box.style.color = m.dark ? '#fff' : '#0f172a';
+      box.innerHTML = m.dark ? '<div style="min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem">' + m.html + '</div>' : m.html;
+    };
+    if (bc) bc.onmessage = e => show(e.data);
+    try {
+      const rc = navigator.presentation && navigator.presentation.receiver;
+      if (rc) rc.connectionList.then(l => {
+        const add = c => { c.onmessage = e => { try { show(JSON.parse(e.data)); } catch (x) {} }; };
+        l.connections.forEach(add); l.onconnectionavailable = ev => add(ev.connection);
+      });
+    } catch (e) {}
+    return;
+  }
+
+  /* Sender */
+  const CFG = window.CAST_CFG;
+  if (!CFG) return;
+  let conn = null, win = null, mode = 'sep', timer = 0, last = '', active = false;
+  const url = () => location.origin + location.pathname + '?cast=1';
+  const ui = document.createElement('div');
+  ui.style.cssText = 'position:fixed;left:12px;bottom:' + (CFG.bottom || 12) + 'px;z-index:55;font-family:inherit';
+  ui.innerHTML = '<button type="button" id="castBtn" title="Auf Bildschirm senden" style="width:44px;height:44px;border-radius:9999px;border:1px solid #cbd5e1;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15);font-size:20px;cursor:pointer">📺</button>' +
+    '<div id="castPanel" style="display:none;position:absolute;left:0;bottom:52px;width:260px;background:#fff;border:1px solid #cbd5e1;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);padding:12px;font-size:13px;color:#0f172a">' +
+    '<div style="font-weight:800;margin-bottom:8px">Auf Bildschirm senden</div>' +
+    '<button type="button" id="castStart" style="width:100%;padding:9px;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;border:0;cursor:pointer">Cast-Bildschirm wählen …</button>' +
+    '<button type="button" id="castWin" style="width:100%;margin-top:6px;padding:8px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;font-weight:700;cursor:pointer">Als Fenster öffnen</button>' +
+    '<div style="display:flex;gap:6px;margin-top:8px"><button type="button" data-cm="sep" style="flex:1;padding:8px;border-radius:10px;border:1px solid #cbd5e1;font-weight:700;cursor:pointer">Getrennt</button><button type="button" data-cm="mirror" style="flex:1;padding:8px;border-radius:10px;border:1px solid #cbd5e1;font-weight:700;cursor:pointer">Gleich</button></div>' +
+    '<p id="castInfo" style="margin:8px 0 0;color:#64748b;font-size:11px;line-height:1.35"></p>' +
+    '<button type="button" id="castStop" style="display:none;width:100%;margin-top:8px;padding:7px;border-radius:10px;border:1px solid #fecaca;color:#b91c1c;font-weight:700;background:#fff;cursor:pointer">Beenden</button></div>';
+  document.body.appendChild(ui);
+  const $ = s => ui.querySelector(s);
+  const info = t => { $('#castInfo').textContent = t; };
+  function paint() {
+    ui.querySelectorAll('[data-cm]').forEach(b => { const on = b.dataset.cm === mode; b.style.background = on ? '#eef2ff' : '#fff'; b.style.borderColor = on ? '#4f46e5' : '#cbd5e1'; b.style.color = on ? '#4338ca' : '#0f172a'; });
+    $('#castStop').style.display = active ? 'block' : 'none';
+    $('#castBtn').style.background = active ? '#eef2ff' : '#fff';
+    info(active ? (mode === 'sep' ? 'Getrennt: Der Bildschirm zeigt die Beamer-Ansicht, du siehst weiter deine Ansicht.' : 'Gleich: Der Bildschirm zeigt dasselbe wie du.') : 'Getrennt = Beamer-Ansicht, Gleich = dasselbe wie du. Ohne Cast öffnet sich ein Fenster, das du auf den zweiten Bildschirm ziehst.');
+  }
+  function send(force) {
+    if (!active) return;
+    let m;
+    try { m = mode === 'sep' ? CFG.sep() : CFG.mirror(); } catch (e) { return; }
+    if (!m) return;
+    const s = JSON.stringify(m);
+    if (!force && s === last) return;
+    last = s;
+    try { if (conn && conn.state === 'connected') conn.send(s); } catch (e) {}
+    try { if (bc) bc.postMessage(m); } catch (e) {}
+  }
+  function stop() {
+    try { if (bc) bc.postMessage({ bye: 1 }); if (conn && conn.state === 'connected') conn.send(JSON.stringify({ bye: 1 })); } catch (e) {}
+    try { if (conn) conn.terminate(); } catch (e) {}
+    try { if (win && !win.closed) win.close(); } catch (e) {}
+    conn = null; win = null; active = false; clearInterval(timer); last = ''; paint();
+  }
+  function begin() {
+    active = true; last = '';
+    clearInterval(timer); timer = setInterval(() => send(false), 700);
+    setTimeout(() => send(true), 1200);
+    paint();
+  }
+  function openWin() {
+    win = window.open(url(), 'castwin', 'popup,width=1280,height=720');
+    if (!win) { info('Das Fenster wurde blockiert. Bitte Pop-ups erlauben.'); return; }
+    begin();
+  }
+  async function startCast() {
+    if (!('PresentationRequest' in window)) { info('Dieser Browser kann nicht casten. Nimm «Als Fenster öffnen» oder spiegle den Bildschirm.'); return; }
+    try {
+      const req = new PresentationRequest([url()]);
+      conn = await req.start();
+      conn.onclose = conn.onterminate = () => { conn = null; if (!win || win.closed) { active = false; clearInterval(timer); paint(); } };
+      conn.onconnect = () => send(true);
+      begin();
+    } catch (e) {
+      conn = null;
+      info(e && e.name === 'NotFoundError' ? 'Kein Cast-Bildschirm gefunden (gleiches WLAN?). Alternativ «Als Fenster öffnen».' : 'Cast abgebrochen oder nicht möglich.');
+    }
+  }
+  $('#castBtn').onclick = () => { const p = $('#castPanel'); p.style.display = p.style.display === 'none' ? 'block' : 'none'; paint(); };
+  $('#castStart').onclick = startCast;
+  $('#castWin').onclick = openWin;
+  $('#castStop').onclick = stop;
+  ui.querySelectorAll('[data-cm]').forEach(b => b.onclick = () => { mode = b.dataset.cm; paint(); send(true); });
+  window.addEventListener('beforeunload', () => { try { if (bc) bc.postMessage({ bye: 1 }); } catch (e) {} });
+  paint();
+})();
+
 </script>
 </body>
 </html>

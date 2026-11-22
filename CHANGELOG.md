@@ -1,5 +1,8 @@
 # Changelog
 
+## Version 2.7 – 22.11.2026
+- Neu: 📺-Knopf unten links «Auf Bildschirm senden». «Cast-Bildschirm wählen» (Chrome mit Chromecast / Cast-fähigem Gerät) oder «Als Fenster öffnen» (für zweiten Bildschirm, z. B. Mac/Apple TV als Zusatzbildschirm, Samsung DeX). Umschalter «Getrennt» (Bildschirm zeigt die Beamer-Ansicht: Gruppen, Timer, gezogene Person) und «Gleich» (dasselbe wie du)
+
 ## Version 2.6 – 22.11.2026
 - Neu: Gruppen mit Regeln. «Nicht zusammen» pro Klasse; die App versucht bis zu 400 Einteilungen und meldet, wenn eine Regel nicht erfüllbar ist
 - Neu: Rollen in Gruppen (Standard: Moderation, Zeit, Schreiben, Präsentation; Liste änderbar), zufällig pro Gruppe verteilt
