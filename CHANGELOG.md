@@ -1,5 +1,13 @@
 # Changelog
 
+## Version 2.6 – 22.11.2026
+- Neu: Gruppen mit Regeln. «Nicht zusammen» pro Klasse; die App versucht bis zu 400 Einteilungen und meldet, wenn eine Regel nicht erfüllbar ist
+- Neu: Rollen in Gruppen (Standard: Moderation, Zeit, Schreiben, Präsentation; Liste änderbar), zufällig pro Gruppe verteilt
+- Neu: Gruppen speichern und später laden (bis 20 pro Klasse, mit der Klasse gesichert)
+- Neu: Gruppen als Bild (PNG) speichern oder drucken / als PDF
+- Neu: Beamer-Ansicht in grosser Schrift (Gruppen und Timer), schliesst mit ✕, Esc oder Zurück-Geste
+- Neu: Reiter «Würfel · Münze · Timer» (1–3 Würfel, W10, W20, Münze, Timer mit Signalton)
+
 ## Version 2.5 – 21.11.2026
 - Neu: Zurück-Geste / Zurück-Taste schliesst offene Fenster (Hilfe, Konto, Klasse bearbeiten) statt die App zu schliessen.
 

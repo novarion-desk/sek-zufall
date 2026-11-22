@@ -26,6 +26,11 @@
             70% { transform: scale(1.02) translateY(-1px); opacity: 1; }
             100% { transform: scale(1) translateY(0); opacity: 1; }
         }
+        #printSheet{display:none}
+        @media print{body>*:not(#printSheet){display:none!important}#printSheet{display:block;padding:12mm;font-family:Inter,Arial,sans-serif;color:#000}
+          #printSheet h1{font-size:20pt;margin:0 0 6mm}#printSheet .pg{display:grid;grid-template-columns:repeat(3,1fr);gap:6mm}
+          #printSheet .pc{border:1.5pt solid #333;border-radius:3mm;padding:4mm;break-inside:avoid}#printSheet .pc b{display:block;font-size:13pt;margin-bottom:2mm}
+          #printSheet .pc div{font-size:12pt;padding:1mm 0}#printSheet small{color:#555}}
         .animate-reveal { animation: popReveal 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     </style>
 </head>
@@ -228,6 +233,7 @@
                     <div class="flex bg-slate-100 p-1 rounded-xl text-xs font-bold">
                         <button type="button" id="modeTabSingle" onclick="switchGeneratorMode('single')" class="px-4 py-2 rounded-lg bg-white text-slate-900 shadow-sm transition-all">Einzelperson ziehen</button>
                         <button type="button" id="modeTabGroups" onclick="switchGeneratorMode('groups')" class="px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all">Gruppen bilden</button>
+                        <button type="button" id="modeTabTools" onclick="switchGeneratorMode('tools')" class="px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all">Würfel · Münze · Timer</button>
                     </div>
                     <div id="drawModeWrapper" class="flex flex-wrap items-center gap-1.5 text-xs font-bold">
                         <div class="relative flex items-center">
@@ -268,10 +274,54 @@
                             <span class="w-32 shrink-0 font-bold text-slate-700">Anzahl Gruppen</span>
                             <div id="groupCountButtons" class="flex flex-wrap gap-1.5"></div>
                         </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="w-32 shrink-0 font-bold text-slate-700">Regeln</span>
+                            <button type="button" id="rulesBtn" onclick="openRulesModal()" class="px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold text-slate-700 hover:bg-slate-100">Nicht zusammen (0)</button>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="w-32 shrink-0 font-bold text-slate-700">Rollen</span>
+                            <button type="button" id="rolesToggle" onclick="toggleRoles()" class="px-3 py-2 rounded-xl border border-slate-300 bg-white font-bold text-slate-700 hover:bg-slate-100">Aus</button>
+                            <input id="rolesInput" type="text" class="hidden flex-1 min-w-[12rem] px-3 py-2 rounded-xl border border-slate-300 text-xs" placeholder="Rollen mit Komma trennen" onchange="saveRolesInput()">
+                        </div>
                         <p class="text-[11px] text-slate-500">Klick auf eine Zahl = Gruppen bilden · nochmals klicken = neu mischen · Klick auf 2 Namen = tauschen</p>
                     </div>
                     <p id="groupsInfoLine" class="hidden -mt-2 text-[11px] text-slate-500"></p>
+                    <div id="groupsActions" class="hidden flex flex-wrap gap-2 text-xs font-bold">
+                        <button type="button" onclick="openBeamer('groups')" class="px-3 py-2 rounded-xl bg-slate-900 text-white">🖥 Beamer</button>
+                        <button type="button" onclick="exportGroupsImage()" class="px-3 py-2 rounded-xl border border-slate-300 bg-white">🖼 Als Bild</button>
+                        <button type="button" onclick="printGroups()" class="px-3 py-2 rounded-xl border border-slate-300 bg-white">🖨 Drucken / PDF</button>
+                        <button type="button" onclick="saveGroupsSet()" class="px-3 py-2 rounded-xl border border-slate-300 bg-white">💾 Gruppen speichern</button>
+                    </div>
+                    <div class="-mt-1"><button type="button" id="savedBtn" onclick="openSavedModal()" class="text-[11px] font-bold text-indigo-700 hover:underline">Gespeicherte Gruppen (0)</button></div>
                     <div id="groupsResultGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+                </div>
+
+                <!-- Werkzeuge: Würfel, Münze, Timer -->
+                <div id="toolsModePanel" class="hidden flex flex-col gap-5">
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 flex flex-col gap-3">
+                            <div class="font-extrabold text-slate-800 text-sm">🎲 Würfel</div>
+                            <div class="flex flex-wrap gap-1.5 text-xs font-bold" id="diceKinds"></div>
+                            <div id="diceResult" class="min-h-[96px] flex items-center justify-center gap-3 text-5xl font-black text-indigo-700 flex-wrap">–</div>
+                            <button type="button" onclick="rollDice()" class="py-3 rounded-xl bg-indigo-600 text-white font-extrabold text-sm">Würfeln</button>
+                        </div>
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 flex flex-col gap-3">
+                            <div class="font-extrabold text-slate-800 text-sm">🪙 Münze</div>
+                            <div id="coinResult" class="min-h-[96px] flex items-center justify-center text-4xl font-black text-indigo-700">–</div>
+                            <button type="button" onclick="flipCoin()" class="py-3 rounded-xl bg-indigo-600 text-white font-extrabold text-sm">Werfen</button>
+                        </div>
+                    </div>
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 flex flex-col gap-3">
+                        <div class="font-extrabold text-slate-800 text-sm">⏱ Timer</div>
+                        <div class="flex flex-wrap gap-1.5 text-xs font-bold" id="timerPresets"></div>
+                        <div class="flex items-center gap-2 text-xs"><span class="font-bold text-slate-700">Eigene Zeit (Min.)</span><input id="timerCustom" type="number" min="1" max="180" class="w-20 px-2 py-1.5 rounded-lg border border-slate-300" onchange="setTimerMinutes(this.value)"></div>
+                        <div id="timerDisplay" class="text-center text-7xl font-black tabular-nums text-slate-900 py-2">05:00</div>
+                        <div class="flex flex-wrap gap-2 text-xs font-bold">
+                            <button type="button" id="timerStartBtn" onclick="timerToggle()" class="px-5 py-3 rounded-xl bg-indigo-600 text-white font-extrabold">Start</button>
+                            <button type="button" onclick="timerReset()" class="px-4 py-3 rounded-xl border border-slate-300 bg-white">Zurück</button>
+                            <button type="button" onclick="openBeamer('timer')" class="px-4 py-3 rounded-xl bg-slate-900 text-white">🖥 Beamer</button>
+                        </div>
+                    </div>
                 </div>
             </section>
         </div>
@@ -299,6 +349,14 @@
                 <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70">
                     <div class="font-extrabold text-slate-900 mb-1">Einzelperson ziehen</div>
                     <p><strong>Zufällig:</strong> jede Ziehung frei, Wiederholungen möglich. <strong>Alle einmal:</strong> jede Person einmal, danach «Alle waren dran», der nächste Klick startet neu. <strong>Endlos:</strong> jede Person einmal, dann sofort die nächste Runde.</p>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70">
+                    <div class="font-extrabold text-slate-900 mb-1">Gruppen: Regeln, Rollen, Beamer</div>
+                    <p><strong>Nicht zusammen:</strong> Personen festlegen, die nicht in dieselbe Gruppe kommen (gilt für die Klasse). <strong>Rollen:</strong> verteilt pro Gruppe zufällig Rollen wie Moderation oder Zeit (Liste änderbar). <strong>Beamer</strong> zeigt die Gruppen gross, <strong>Als Bild</strong> speichert ein PNG, <strong>Drucken / PDF</strong> öffnet den Druckdialog. <strong>Gruppen speichern</strong> merkt sich die Einteilung für später (bis 20 pro Klasse).</p>
+                </div>
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70">
+                    <div class="font-extrabold text-slate-900 mb-1">Würfel · Münze · Timer</div>
+                    <p>Dritter Reiter oben. Der Timer läuft auch in der Beamer-Ansicht gross und piepst am Ende.</p>
                 </div>
                 <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70">
                     <div class="font-extrabold text-slate-900 mb-1">3. Retour</div>
@@ -401,6 +459,46 @@
         </div>
     </div>
 
+    <!-- MODAL: Regeln (nicht zusammen) -->
+    <div id="rulesModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="text-base font-extrabold text-slate-900">Nicht zusammen in einer Gruppe</h3>
+                <button type="button" onclick="closeModal('rulesModal')" class="text-slate-400 hover:text-slate-700 p-1 text-xl leading-none">✕</button>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 text-xs">
+                <select id="ruleA" class="flex-1 min-w-[7rem] px-2 py-2 rounded-lg border border-slate-300"></select>
+                <span class="font-bold text-slate-500">und</span>
+                <select id="ruleB" class="flex-1 min-w-[7rem] px-2 py-2 rounded-lg border border-slate-300"></select>
+                <button type="button" onclick="addRule()" class="px-3 py-2 rounded-lg bg-indigo-600 text-white font-bold">Hinzufügen</button>
+            </div>
+            <div id="rulesList" class="flex flex-col gap-1.5 text-xs"></div>
+            <p class="text-[11px] text-slate-500">Die Regeln gelten für diese Klasse und werden mit der Klasse gespeichert. Ist eine Regel nicht erfüllbar (z. B. zu wenige Gruppen), erscheint ein Hinweis.</p>
+            <button type="button" onclick="closeModal('rulesModal')" class="w-full py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold">Fertig</button>
+        </div>
+    </div>
+
+    <!-- MODAL: Gespeicherte Gruppen -->
+    <div id="savedModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="text-base font-extrabold text-slate-900">Gespeicherte Gruppen</h3>
+                <button type="button" onclick="closeModal('savedModal')" class="text-slate-400 hover:text-slate-700 p-1 text-xl leading-none">✕</button>
+            </div>
+            <div id="savedList" class="flex flex-col gap-2 text-xs"></div>
+            <button type="button" onclick="closeModal('savedModal')" class="w-full py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold">Schliessen</button>
+        </div>
+    </div>
+
+    <!-- Beamer-Ansicht -->
+    <div id="beamerOverlay" class="hidden fixed inset-0 z-[60] bg-slate-900 text-white overflow-auto">
+        <button type="button" onclick="closeBeamer()" class="fixed top-3 right-3 z-10 w-12 h-12 rounded-full bg-white/15 hover:bg-white/25 text-2xl font-black" aria-label="Schliessen">✕</button>
+        <div id="beamerBody" class="min-h-full p-6 md:p-10 flex flex-col items-center justify-center"></div>
+    </div>
+
+    <!-- Druckvorlage -->
+    <div id="printSheet"></div>
+
     <!-- Toast -->
     <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-lg transition-opacity duration-300 opacity-0 pointer-events-none z-[60] flex items-center gap-2">
         <i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>
@@ -408,7 +506,7 @@
     </div>
 
     <script>
-        const APP_VERSION = '2.2';
+        const APP_VERSION = '2.6';
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
@@ -470,6 +568,7 @@
         let currentZoom = parseFloat(localStorage.getItem('sekZufallZoom')) || 1.0;
         let swapSelection = null;
         let lastGeneratedGroups = [];
+        let lastGroupRoles = [];       // Rollen parallel zu den Gruppen (gleiche Positionen)
         let isAttendanceOpen = true;
         let undoStack = [];
         let lastManualExportAt = '';
@@ -495,7 +594,9 @@
                     seenSt.add(sid);
                     return { id: sid, name: s.name, present: s.present !== false, drawn: !!s.drawn };
                 });
-                return { id: cid, name: c.name, students };
+                const rules = (Array.isArray(c.rules) ? c.rules : []).filter(r => Array.isArray(r) && r.length === 2 && typeof r[0] === 'string' && typeof r[1] === 'string');
+                const saved = (Array.isArray(c.saved) ? c.saved : []).filter(x => x && Array.isArray(x.groups)).slice(0, 20);
+                return { id: cid, name: c.name, students, rules, saved };
             });
         }
 
@@ -508,6 +609,7 @@
                 classesData: JSON.parse(JSON.stringify(classesData)),
                 activeClassId,
                 lastGeneratedGroups: JSON.parse(JSON.stringify(lastGeneratedGroups)),
+                lastGroupRoles: JSON.parse(JSON.stringify(lastGroupRoles)),
                 pickedHtml: document.getElementById('pickedResultBox')?.innerHTML || '',
                 isAttendanceOpen
             });
@@ -535,6 +637,7 @@
             classesData = prev.classesData;
             activeClassId = prev.activeClassId;
             lastGeneratedGroups = prev.lastGeneratedGroups;
+            lastGroupRoles = prev.lastGroupRoles || [];
             swapSelection = null;
             roundEndShownFor = null;
             updatePickButtonLabel();
@@ -874,6 +977,7 @@
             classesData = normalizeClasses(classes);
             activeClassId = classesData.length ? classesData[0].id : null;
             lastGeneratedGroups = [];
+            lastGroupRoles = [];
             swapSelection = null;
             document.getElementById('pickedResultBox').innerHTML = pickedPlaceholder();
             renderAppContent();
@@ -962,14 +1066,17 @@
         }
 
         function switchGeneratorMode(mode) {
-            const single = mode === 'single';
+            const single = mode === 'single', groups = mode === 'groups', tools = mode === 'tools';
             document.getElementById('singleModePanel').classList.toggle('hidden', !single);
-            document.getElementById('groupsModePanel').classList.toggle('hidden', single);
+            document.getElementById('groupsModePanel').classList.toggle('hidden', !groups);
+            document.getElementById('toolsModePanel').classList.toggle('hidden', !tools);
             document.getElementById('drawModeWrapper').classList.toggle('hidden', !single);
             const on = "px-4 py-2 rounded-lg bg-white text-slate-900 shadow-sm transition-all";
             const off = "px-4 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition-all";
             document.getElementById('modeTabSingle').className = single ? on : off;
-            document.getElementById('modeTabGroups').className = single ? off : on;
+            document.getElementById('modeTabGroups').className = groups ? on : off;
+            document.getElementById('modeTabTools').className = tools ? on : off;
+            if (tools) renderToolsUI();
         }
 
         // =========================================================================
@@ -1183,7 +1290,8 @@
                 classesData.push({
                     id: newClsId,
                     name: nameVal,
-                    students: parsedNames.map(n => ({ id: newId(newClsId), name: n, present: true, drawn: false }))
+                    students: parsedNames.map(n => ({ id: newId(newClsId), name: n, present: true, drawn: false })),
+                    rules: [], saved: []
                 });
                 activeClassId = newClsId;
                 lastGeneratedGroups = [];
@@ -1365,19 +1473,33 @@
 
             pushUndoSnapshot("Gruppen gemischt");
 
-            const shuffled = [...present];
-            for (let i = shuffled.length - 1; i > 0; i--) {
-                const j = randomInt(i + 1);
-                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-            }
-
             if (!lastGroupChoice) return;
             const mode = lastGroupChoice.mode;
             const val = lastGroupChoice.val;
-            const numGroups = computeGroupCount(shuffled.length, mode, val);
-
-            const groups = Array.from({ length: numGroups }, () => []);
-            shuffled.forEach((name, idx) => groups[idx % numGroups].push(name));
+            const numGroups = computeGroupCount(present.length, mode, val);
+            const rules = (cls.rules || []).filter(r => present.includes(r[0]) && present.includes(r[1]));
+            const deal = () => {
+                const sh = [...present];
+                for (let i = sh.length - 1; i > 0; i--) {
+                    const j = randomInt(i + 1);
+                    [sh[i], sh[j]] = [sh[j], sh[i]];
+                }
+                const g = Array.from({ length: numGroups }, () => []);
+                sh.forEach((name, idx) => g[idx % numGroups].push(name));
+                return g;
+            };
+            const violations = g => rules.reduce((n, r) => n + (g.some(m => m.includes(r[0]) && m.includes(r[1])) ? 1 : 0), 0);
+            let groups = deal(), bad = violations(groups);
+            for (let t = 0; t < 400 && bad > 0; t++) {
+                const g = deal(), v = violations(g);
+                if (v < bad) { groups = g; bad = v; }
+            }
+            const shuffled = present;
+            lastGroupRoles = rolesEnabled() ? groups.map(g => {
+                const rl = getRoles();
+                for (let i = rl.length - 1; i > 0; i--) { const j = randomInt(i + 1); [rl[i], rl[j]] = [rl[j], rl[i]]; }
+                return g.map((_, i) => rl[i] || '');
+            }) : [];
 
             // Hinweis, wenn die Vorgabe nicht exakt erfüllbar war
             const info = document.getElementById('groupsInfoLine');
@@ -1385,6 +1507,7 @@
             let note = '';
             if (mode === 'maxSize' && maxSize > val) note = `Hinweis: ${shuffled.length} Anwesende gehen mit max. ${val} nicht ohne 1er-Gruppe auf – deshalb ist mindestens eine Gruppe grösser.`;
             if (mode === 'numGroups' && numGroups < val) note = `Hinweis: Mit ${shuffled.length} Anwesenden sind höchstens ${numGroups} Gruppen ohne 1er-Gruppe möglich.`;
+            if (bad > 0) note += (note ? ' ' : '') + `Hinweis: ${bad} Regel(n) «nicht zusammen» liessen sich mit dieser Einteilung nicht erfüllen.`;
             info.innerText = note;
             info.classList.toggle('hidden', !note);
 
@@ -1397,6 +1520,7 @@
         function renderGroupsGrid() {
             const grid = document.getElementById('groupsResultGrid');
             if (!grid) return;
+            refreshGroupExtras();
             if (!lastGeneratedGroups || lastGeneratedGroups.length === 0) {
                 document.getElementById('groupsInfoLine').classList.add('hidden');
                 grid.innerHTML = `<div class="col-span-full py-10 text-center text-xs text-slate-400 italic">Auf eine Zahl klicken – die Gruppen werden sofort gebildet.</div>`;
@@ -1414,7 +1538,7 @@
                     <div class="flex flex-col gap-1.5">
                         ${members.map((m, mIdx) => {
                             const isSelected = swapSelection && swapSelection.gIdx === gIdx && swapSelection.mIdx === mIdx;
-                            return `<button type="button" onclick="handleSwapClick(${gIdx}, ${mIdx})" class="text-[0.95rem] text-left px-3 py-2 rounded-xl font-bold transition-colors ${isSelected ? 'bg-amber-200 text-amber-950 ring-2 ring-amber-500' : 'bg-white hover:bg-indigo-50 text-slate-800 border border-slate-200/70'}">${escapeHtml(m)}</button>`;
+                            return `<button type="button" onclick="handleSwapClick(${gIdx}, ${mIdx})" class="text-[0.95rem] text-left px-3 py-2 rounded-xl font-bold transition-colors ${isSelected ? 'bg-amber-200 text-amber-950 ring-2 ring-amber-500' : 'bg-white hover:bg-indigo-50 text-slate-800 border border-slate-200/70'}">${escapeHtml(m)}${(lastGroupRoles[gIdx] && lastGroupRoles[gIdx][mIdx]) ? ` <span class="ml-1 text-[10.5px] font-extrabold text-indigo-600">${escapeHtml(lastGroupRoles[gIdx][mIdx])}</span>` : ''}</button>`;
                         }).join('')}
                     </div>
                 `;
@@ -1476,13 +1600,292 @@
     </script>
 <script>
 /* Feedback: öffnet das anonyme Tally-Formular (App, Version und Gerät werden mitgegeben, keine Personendaten) */
-function openAppFeedback(){var q=new URLSearchParams({app:'sekzufall',version:'2.5',geraet:(navigator.userAgent||'').slice(0,120)});window.open('https://tally.so/r/GeR9re?'+q.toString(),'_blank','noopener');}
+
+/* ===== Version 2.6: Regeln, Rollen, Speichern, Export, Beamer, Werkzeuge ===== */
+const DEFAULT_ROLES = ['Moderation', 'Zeit', 'Schreiben', 'Präsentation'];
+function rolesEnabled() { try { return localStorage.getItem('sekZufallRolesOn') === '1'; } catch (e) { return false; } }
+function getRoles() {
+    let r = null;
+    try { r = JSON.parse(localStorage.getItem('sekZufallRoles')); } catch (e) {}
+    return (Array.isArray(r) && r.length ? r : DEFAULT_ROLES).slice();
+}
+function toggleRoles() {
+    try { localStorage.setItem('sekZufallRolesOn', rolesEnabled() ? '0' : '1'); } catch (e) {}
+    refreshGroupExtras();
+    if (lastGroupChoice && lastGeneratedGroups.length) generateGroups();
+}
+function saveRolesInput() {
+    const list = document.getElementById('rolesInput').value.split(',').map(x => x.trim()).filter(Boolean);
+    try { localStorage.setItem('sekZufallRoles', JSON.stringify(list.length ? list : DEFAULT_ROLES)); } catch (e) {}
+    refreshGroupExtras();
+}
+function refreshGroupExtras() {
+    const cls = getActiveClass();
+    const rb = document.getElementById('rulesBtn');
+    if (rb) rb.textContent = `Nicht zusammen (${cls && cls.rules ? cls.rules.length : 0})`;
+    const on = rolesEnabled();
+    const t = document.getElementById('rolesToggle');
+    if (t) { t.textContent = on ? 'An' : 'Aus'; t.className = 'px-3 py-2 rounded-xl border font-bold ' + (on ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'); }
+    const ri = document.getElementById('rolesInput');
+    if (ri) { ri.classList.toggle('hidden', !on); if (document.activeElement !== ri) ri.value = getRoles().join(', '); }
+    const sb = document.getElementById('savedBtn');
+    if (sb) sb.textContent = `Gespeicherte Gruppen (${cls && cls.saved ? cls.saved.length : 0})`;
+    const ga = document.getElementById('groupsActions');
+    if (ga) ga.classList.toggle('hidden', !(lastGeneratedGroups && lastGeneratedGroups.length));
+}
+
+/* Regeln */
+function openRulesModal() {
+    const cls = getActiveClass();
+    if (!cls) return;
+    const opts = cls.students.map(st => `<option value="${escapeHtml(st.name)}">${escapeHtml(st.name)}</option>`).join('');
+    document.getElementById('ruleA').innerHTML = opts;
+    document.getElementById('ruleB').innerHTML = opts;
+    if (cls.students.length > 1) document.getElementById('ruleB').selectedIndex = 1;
+    renderRulesList();
+    document.getElementById('rulesModal').classList.remove('hidden');
+}
+function renderRulesList() {
+    const cls = getActiveClass();
+    const rules = (cls && cls.rules) || [];
+    document.getElementById('rulesList').innerHTML = rules.length ? rules.map((r, i) =>
+        `<div class="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2"><span class="font-bold">${escapeHtml(r[0])} ≠ ${escapeHtml(r[1])}</span><button type="button" onclick="removeRule(${i})" class="text-rose-600 font-extrabold px-2">✕</button></div>`).join('')
+        : '<p class="text-slate-400 italic">Noch keine Regeln.</p>';
+    refreshGroupExtras();
+}
+function addRule() {
+    const cls = getActiveClass();
+    if (!cls) return;
+    const a = document.getElementById('ruleA').value, b = document.getElementById('ruleB').value;
+    if (!a || !b || a === b) { showToast('Bitte zwei verschiedene Personen wählen.'); return; }
+    cls.rules = cls.rules || [];
+    if (cls.rules.some(r => (r[0] === a && r[1] === b) || (r[0] === b && r[1] === a))) { showToast('Diese Regel gibt es schon.'); return; }
+    cls.rules.push([a, b]);
+    renderRulesList();
+    saveClassesToCloud();
+}
+function removeRule(i) {
+    const cls = getActiveClass();
+    if (!cls || !cls.rules) return;
+    cls.rules.splice(i, 1);
+    renderRulesList();
+    saveClassesToCloud();
+}
+
+/* Gruppen speichern / laden */
+function saveGroupsSet() {
+    const cls = getActiveClass();
+    if (!cls || !lastGeneratedGroups.length) return;
+    const d = new Date();
+    const def = `Gruppen ${d.getDate()}.${d.getMonth() + 1}.`;
+    let name = null;
+    try { name = window.prompt('Name für diese Gruppen:', def); } catch (e) { name = def; }
+    if (name === null) return;
+    cls.saved = cls.saved || [];
+    cls.saved.unshift({ id: newId('grp'), name: (name.trim() || def).slice(0, 40), ts: d.toISOString(), groups: JSON.parse(JSON.stringify(lastGeneratedGroups)), roles: JSON.parse(JSON.stringify(lastGroupRoles)) });
+    cls.saved = cls.saved.slice(0, 20);
+    refreshGroupExtras();
+    saveClassesToCloud();
+    showToast(isGuest ? 'Gespeichert (Demo, nicht dauerhaft).' : 'Gruppen gespeichert.');
+}
+function openSavedModal() {
+    renderSavedList();
+    document.getElementById('savedModal').classList.remove('hidden');
+}
+function renderSavedList() {
+    const cls = getActiveClass();
+    const list = (cls && cls.saved) || [];
+    document.getElementById('savedList').innerHTML = list.length ? list.map((x, i) =>
+        `<div class="flex items-center justify-between gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5"><div class="min-w-0"><div class="font-extrabold text-slate-800 truncate">${escapeHtml(x.name)}</div><div class="text-[11px] text-slate-500">${x.groups.length} Gruppen · ${escapeHtml(formatDateTime(x.ts))}</div></div><div class="flex gap-1.5 shrink-0"><button type="button" onclick="loadSavedGroups(${i})" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold">Laden</button><button type="button" onclick="deleteSavedGroups(${i})" class="px-2 py-1.5 text-rose-600 font-extrabold">✕</button></div></div>`).join('')
+        : '<p class="text-slate-400 italic">Noch nichts gespeichert. Gruppen bilden und «Gruppen speichern» wählen.</p>';
+    refreshGroupExtras();
+}
+function loadSavedGroups(i) {
+    const cls = getActiveClass();
+    const x = cls && cls.saved && cls.saved[i];
+    if (!x) return;
+    pushUndoSnapshot('Gespeicherte Gruppen geladen');
+    lastGeneratedGroups = JSON.parse(JSON.stringify(x.groups));
+    lastGroupRoles = JSON.parse(JSON.stringify(x.roles || []));
+    lastGroupChoice = null;
+    swapSelection = null;
+    document.getElementById('groupsInfoLine').classList.add('hidden');
+    renderGroupButtons();
+    renderGroupsGrid();
+    closeModal('savedModal');
+    showToast(`Geladen: ${x.name}`);
+}
+function deleteSavedGroups(i) {
+    const cls = getActiveClass();
+    if (!cls || !cls.saved) return;
+    cls.saved.splice(i, 1);
+    renderSavedList();
+    saveClassesToCloud();
+}
+
+/* Export: Bild und Druck */
+function groupsTitle() {
+    const cls = getActiveClass();
+    const d = new Date();
+    return `${cls ? cls.name + ' · ' : ''}Gruppen · ${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+}
+function exportGroupsImage() {
+    const g = lastGeneratedGroups;
+    if (!g.length) return;
+    const cols = Math.min(4, g.length <= 2 ? g.length : g.length <= 4 ? 2 : g.length <= 9 ? 3 : 4);
+    const rows = Math.ceil(g.length / cols);
+    const cw = 420, pad = 36, gap = 24, lineH = 46, headH = 70;
+    const rowH = r => Math.max(...g.slice(r * cols, r * cols + cols).map(m => headH + m.length * lineH + 24));
+    let H = 130 + pad;
+    for (let r = 0; r < rows; r++) H += rowH(r) + gap;
+    const W = pad * 2 + cols * cw + (cols - 1) * gap;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const x = c.getContext('2d');
+    x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H);
+    x.fillStyle = '#0f172a'; x.font = '800 38px Inter, Arial, sans-serif'; x.textBaseline = 'alphabetic';
+    x.fillText(groupsTitle(), pad, 80);
+    let y = 130;
+    for (let r = 0; r < rows; r++) {
+        const h = rowH(r);
+        for (let k = 0; k < cols; k++) {
+            const gi = r * cols + k;
+            if (gi >= g.length) break;
+            const px = pad + k * (cw + gap);
+            x.fillStyle = '#f1f5f9'; x.strokeStyle = '#cbd5e1'; x.lineWidth = 2;
+            x.beginPath(); x.roundRect(px, y, cw, h, 20); x.fill(); x.stroke();
+            x.fillStyle = '#4338ca'; x.font = '800 30px Inter, Arial, sans-serif';
+            x.fillText(`Team ${gi + 1}`, px + 22, y + 46);
+            g[gi].forEach((nm, mi) => {
+                const ly = y + headH + mi * lineH + 28;
+                x.fillStyle = '#0f172a'; x.font = '700 28px Inter, Arial, sans-serif';
+                x.fillText(nm, px + 22, ly);
+                const role = lastGroupRoles[gi] && lastGroupRoles[gi][mi];
+                if (role) {
+                    x.fillStyle = '#4f46e5'; x.font = '700 20px Inter, Arial, sans-serif';
+                    x.textAlign = 'right'; x.fillText(role, px + cw - 22, ly); x.textAlign = 'left';
+                }
+            });
+        }
+        y += h + gap;
+    }
+    c.toBlob(blob => {
+        if (!blob) { showToast('Bild konnte nicht erstellt werden.'); return; }
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'gruppen.png';
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+        showToast('Bild gespeichert.');
+    }, 'image/png');
+}
+function printGroups() {
+    const g = lastGeneratedGroups;
+    if (!g.length) return;
+    document.getElementById('printSheet').innerHTML = `<h1>${escapeHtml(groupsTitle())}</h1><div class="pg">` + g.map((m, gi) =>
+        `<div class="pc"><b>Team ${gi + 1}</b>` + m.map((n, mi) => `<div>${escapeHtml(n)}${(lastGroupRoles[gi] && lastGroupRoles[gi][mi]) ? ` <small>· ${escapeHtml(lastGroupRoles[gi][mi])}</small>` : ''}</div>`).join('') + '</div>').join('') + '</div>';
+    window.print();
+}
+
+/* Beamer-Ansicht */
+let beamerKind = null;
+function openBeamer(kind) {
+    beamerKind = kind;
+    const body = document.getElementById('beamerBody');
+    if (kind === 'groups') {
+        const g = lastGeneratedGroups;
+        if (!g.length) return;
+        const cols = g.length <= 2 ? g.length : g.length <= 6 ? 3 : 4;
+        const fs = g.length <= 4 ? '2.6rem' : g.length <= 8 ? '2rem' : '1.6rem';
+        body.innerHTML = `<div class="w-full grid gap-5" style="grid-template-columns:repeat(${cols},minmax(0,1fr))">` + g.map((m, gi) =>
+            `<div class="rounded-3xl bg-white/10 p-6"><div class="font-black text-amber-300 mb-3" style="font-size:calc(${fs}*0.8)">Team ${gi + 1}</div>` +
+            m.map((n, mi) => `<div class="font-extrabold leading-tight py-1" style="font-size:${fs}">${escapeHtml(n)}${(lastGroupRoles[gi] && lastGroupRoles[gi][mi]) ? ` <span class="text-indigo-300 font-bold" style="font-size:calc(${fs}*0.55)">${escapeHtml(lastGroupRoles[gi][mi])}</span>` : ''}</div>`).join('') + '</div>').join('') + '</div>';
+    } else if (kind === 'timer') {
+        body.innerHTML = '<div id="beamerTimer" class="font-black tabular-nums" style="font-size:min(28vw,34vh)">' + timerText() + '</div><div class="flex gap-4 mt-8"><button type="button" onclick="timerToggle()" id="beamerTimerBtn" class="px-10 py-5 rounded-2xl bg-indigo-600 text-3xl font-extrabold">' + (T.running ? 'Pause' : 'Start') + '</button><button type="button" onclick="timerReset()" class="px-8 py-5 rounded-2xl bg-white/15 text-3xl font-extrabold">Zurück</button></div>';
+    }
+    document.getElementById('beamerOverlay').classList.remove('hidden');
+    const el = document.documentElement;
+    try { if (el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen().catch(() => {}); } catch (e) {}
+}
+function closeBeamer() {
+    document.getElementById('beamerOverlay').classList.add('hidden');
+    beamerKind = null;
+    try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch (e) {}
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && beamerKind) closeBeamer(); });
+
+/* Würfel & Münze */
+const DICE_KINDS = [['1 Würfel', 1, 6], ['2 Würfel', 2, 6], ['3 Würfel', 3, 6], ['W20', 1, 20], ['W10', 1, 10]];
+let diceSel = 0;
+function renderToolsUI() {
+    document.getElementById('diceKinds').innerHTML = DICE_KINDS.map((k, i) =>
+        `<button type="button" onclick="diceSel=${i};renderToolsUI()" class="px-3 py-2 rounded-xl border ${i === diceSel ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 bg-white text-slate-700'}">${k[0]}</button>`).join('');
+    document.getElementById('timerPresets').innerHTML = [1, 2, 3, 5, 10, 15, 20].map(m =>
+        `<button type="button" onclick="setTimerMinutes(${m})" class="px-3 py-2 rounded-xl border ${T.total === m * 60 ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-300 bg-white text-slate-700'}">${m} Min.</button>`).join('');
+    timerPaint();
+}
+function rollDice() {
+    const k = DICE_KINDS[diceSel], out = [];
+    for (let i = 0; i < k[1]; i++) out.push(randomInt(k[2]) + 1);
+    const box = document.getElementById('diceResult');
+    box.innerHTML = out.map(v => `<span class="animate-reveal inline-flex items-center justify-center min-w-[3.5rem] h-16 px-3 rounded-2xl bg-white border-2 border-indigo-200 shadow-sm">${v}</span>`).join('') + (out.length > 1 ? `<span class="text-2xl text-slate-500 font-extrabold">= ${out.reduce((a, b) => a + b, 0)}</span>` : '');
+}
+function flipCoin() {
+    const head = randomInt(2) === 0;
+    document.getElementById('coinResult').innerHTML = `<span class="animate-reveal inline-flex items-center justify-center w-24 h-24 rounded-full border-4 ${head ? 'bg-amber-200 border-amber-500 text-amber-900' : 'bg-slate-200 border-slate-500 text-slate-800'}">${head ? 'Kopf' : 'Zahl'}</span>`;
+}
+
+/* Timer */
+const T = { total: 300, left: 300, running: false, end: 0, id: 0 };
+function timerText() { const s = Math.max(0, Math.ceil(T.left)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
+function timerPaint() {
+    const d = document.getElementById('timerDisplay'); if (d) { d.textContent = timerText(); d.className = 'text-center text-7xl font-black tabular-nums py-2 ' + (T.left <= 10 && T.running ? 'text-rose-600' : 'text-slate-900'); }
+    const sb = document.getElementById('timerStartBtn'); if (sb) sb.textContent = T.running ? 'Pause' : (T.left < T.total && T.left > 0 ? 'Weiter' : 'Start');
+    const b = document.getElementById('beamerTimer'); if (b) { b.textContent = timerText(); b.style.color = T.left <= 10 && T.running ? '#fb7185' : ''; }
+    const bb = document.getElementById('beamerTimerBtn'); if (bb) bb.textContent = T.running ? 'Pause' : (T.left < T.total && T.left > 0 ? 'Weiter' : 'Start');
+}
+function setTimerMinutes(m) {
+    m = Math.max(1, Math.min(180, parseInt(m, 10) || 5));
+    timerStop(); T.total = T.left = m * 60; renderToolsUI();
+}
+function timerStop() { T.running = false; clearInterval(T.id); }
+function timerTick() {
+    T.left = (T.end - Date.now()) / 1000;
+    if (T.left <= 0) { T.left = 0; timerStop(); timerBeep(); }
+    timerPaint();
+}
+function timerToggle() {
+    if (T.running) { timerStop(); timerPaint(); return; }
+    if (T.left <= 0) T.left = T.total;
+    T.running = true; T.end = Date.now() + T.left * 1000;
+    clearInterval(T.id); T.id = setInterval(timerTick, 250);
+    timerAudioUnlock(); timerPaint();
+}
+function timerReset() { timerStop(); T.left = T.total; timerPaint(); }
+let audioCtx = null;
+function timerAudioUnlock() { try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); } catch (e) {} }
+function timerBeep() {
+    try {
+        timerAudioUnlock();
+        [0, 0.45, 0.9].forEach(t => {
+            const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+            o.frequency.value = 880; o.connect(g); g.connect(audioCtx.destination);
+            g.gain.setValueAtTime(0.0001, audioCtx.currentTime + t);
+            g.gain.exponentialRampToValueAtTime(0.4, audioCtx.currentTime + t + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + t + 0.35);
+            o.start(audioCtx.currentTime + t); o.stop(audioCtx.currentTime + t + 0.4);
+        });
+    } catch (e) {}
+    showToast('Zeit ist um!');
+}
+
+function openAppFeedback(){var q=new URLSearchParams({app:'sekzufall',version:'2.6',geraet:(navigator.userAgent||'').slice(0,120)});window.open('https://tally.so/r/GeR9re?'+q.toString(),'_blank','noopener');}
 
 /* ===== Zurück-Geste (Handy): ein Schritt zurück statt App schliessen ===== */
 (function(){
  let depth=0,ign=0,raf=0;
- const isSub=()=>{try{return !!(document.querySelector('#helpModal:not(.hidden),#accountModal:not(.hidden),#classEditorModal:not(.hidden)'))}catch(e){return false}};
- const goBack=()=>{try{document.querySelectorAll('#helpModal,#accountModal,#classEditorModal').forEach(e=>e.classList.add('hidden'))}catch(e){}};
+ const isSub=()=>{try{return !!(document.querySelector('#helpModal:not(.hidden),#accountModal:not(.hidden),#classEditorModal:not(.hidden),#rulesModal:not(.hidden),#savedModal:not(.hidden),#beamerOverlay:not(.hidden)'))}catch(e){return false}};
+ const goBack=()=>{try{document.querySelectorAll('#helpModal,#accountModal,#classEditorModal,#rulesModal,#savedModal,#beamerOverlay').forEach(e=>e.classList.add('hidden'))}catch(e){}};
  function sync(){
   raf=0;const want=isSub();
   if(want&&!depth){history.pushState({sub:1},'');depth=1}
