@@ -17,6 +17,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="drive-backup.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
         body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
@@ -412,6 +413,7 @@
                     </label>
                 </div>
                 <p class="text-[11px] text-slate-500">Vor jedem Einspielen und jeder Wiederherstellung wird der aktuelle Stand automatisch gesichert.</p>
+                <div id="driveMountZufall"></div>
             </div>
 
             <button type="button" onclick="logoutUser()" class="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2">
@@ -506,7 +508,7 @@
     </div>
 
     <script>
-        const APP_VERSION = '2.7';
+        const APP_VERSION = '2.8';
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
@@ -1599,6 +1601,24 @@
         }
     </script>
 <script>
+/* Google Drive: Sicherung (ab Version 2.8) */
+(function(){
+  function go(){
+    var host=document.getElementById('driveMountZufall'); if(!host||!window.DriveBackup||host.dataset.mounted)return; host.dataset.mounted='1';
+    DriveBackup.mountSection({host:host,app:'Sek Zufall',repo:'sek-zufall',
+      getEmail:function(){return currentUser?currentUser.email:'';},
+      isDemo:function(){return typeof isDemoMode!=='undefined'&&!!isDemoMode;},
+      toast:function(m){showToast(m);},
+      getBackup:async function(){
+        var payload={app:'sek-zufall',appVersion:APP_VERSION,exportedAt:new Date().toISOString(),account:currentUser?currentUser.email:null,classes:classesData};
+        var blob=new Blob([JSON.stringify(payload)],{type:'application/json'});
+        var n=Array.isArray(classesData)?classesData.length:Object.keys(classesData||{}).length;
+        return {blob:blob,name:'zufallsgenerator-backup-'+todayStr()+'.json',info:n+' Klassen, '+(blob.size/1024).toFixed(0)+' KB'};
+      }});
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',go);else go();
+})();
+
 /* Feedback: öffnet das anonyme Tally-Formular (App, Version und Gerät werden mitgegeben, keine Personendaten) */
 
 window.CAST_CFG = {
