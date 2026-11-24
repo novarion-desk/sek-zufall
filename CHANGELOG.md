@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 2.9 – 24.11.2026
+- Neu: Der 📺-Knopf «Auf Bildschirm senden» erscheint nur noch mit Lehrer-Login (nicht im Gast-/Demo-Modus)
+- Besser: Meldungen im Cast-Fenster sind gross und gut lesbar und nennen den Grund (z. B. kein Cast-Gerät gefunden) samt Tipp für das Galaxy Tab (Smart View)
+
 ## Version 2.8 – 23.11.2026
 - Neu: Unter «Konto & Sicherungen» gibt es «Google Drive»: «Jetzt in Drive sichern» legt die Backup-Datei (.json) im Drive-Ordner «Teaching Cockpit Backups / Sek Zufall» ab. Eigener Zielordner wählbar, optionale Erinnerung beim Öffnen (höchstens 1× pro Woche)
 - Neu, nur für den Besitzer: «Code dieser App sichern» (ZIP in Drive) mit optionaler Erinnerung

@@ -508,7 +508,7 @@
     </div>
 
     <script>
-        const APP_VERSION = '2.8';
+        const APP_VERSION = '2.9';
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
@@ -1623,6 +1623,8 @@
 
 window.CAST_CFG = {
     bottom: 12,
+    // Cast-Knopf nur für die angemeldete Lehrperson (nicht im Gast-/Demo-Modus, nicht auf dem Anmeldebildschirm)
+    show: () => { try { return !!currentUser && !isGuest; } catch (e) { return false; } },
     mirror: () => ({ html: document.getElementById('mainArea').innerHTML, dark: false }),
     sep: () => {
         const vis = id => { const e = document.getElementById(id); return e && !e.classList.contains('hidden'); };
@@ -1978,17 +1980,21 @@ function openAppFeedback(){var q=new URLSearchParams({app:'sekzufall',version:'2
   const url = () => location.origin + location.pathname + '?cast=1';
   const ui = document.createElement('div');
   ui.style.cssText = 'position:fixed;left:12px;bottom:' + (CFG.bottom || 12) + 'px;z-index:55;font-family:inherit';
+  const vis = () => { const on = !CFG.show || CFG.show(); ui.style.display = on ? '' : 'none'; if (!on && active) stop(); };
+  ui.style.display = 'none';
+  setInterval(vis, 600);
   ui.innerHTML = '<button type="button" id="castBtn" title="Auf Bildschirm senden" style="width:44px;height:44px;border-radius:9999px;border:1px solid #cbd5e1;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15);font-size:20px;cursor:pointer">📺</button>' +
     '<div id="castPanel" style="display:none;position:absolute;left:0;bottom:52px;width:260px;background:#fff;border:1px solid #cbd5e1;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.2);padding:12px;font-size:13px;color:#0f172a">' +
     '<div style="font-weight:800;margin-bottom:8px">Auf Bildschirm senden</div>' +
     '<button type="button" id="castStart" style="width:100%;padding:9px;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;border:0;cursor:pointer">Cast-Bildschirm wählen …</button>' +
     '<button type="button" id="castWin" style="width:100%;margin-top:6px;padding:8px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;font-weight:700;cursor:pointer">Als Fenster öffnen</button>' +
     '<div style="display:flex;gap:6px;margin-top:8px"><button type="button" data-cm="sep" style="flex:1;padding:8px;border-radius:10px;border:1px solid #cbd5e1;font-weight:700;cursor:pointer">Getrennt</button><button type="button" data-cm="mirror" style="flex:1;padding:8px;border-radius:10px;border:1px solid #cbd5e1;font-weight:700;cursor:pointer">Gleich</button></div>' +
-    '<p id="castInfo" style="margin:8px 0 0;color:#64748b;font-size:11px;line-height:1.35"></p>' +
+    '<p id="castInfo" style="margin:8px 0 0;color:#475569;font-size:13px;line-height:1.4"></p>' +
     '<button type="button" id="castStop" style="display:none;width:100%;margin-top:8px;padding:7px;border-radius:10px;border:1px solid #fecaca;color:#b91c1c;font-weight:700;background:#fff;cursor:pointer">Beenden</button></div>';
   document.body.appendChild(ui);
   const $ = s => ui.querySelector(s);
-  const info = t => { $('#castInfo').textContent = t; };
+  const info = (t, bad) => { const el = $('#castInfo'); el.textContent = t; el.style.color = bad ? '#b45309' : '#475569'; el.style.fontWeight = bad ? '700' : '400'; };
+  const HINT = 'Auf dem Galaxy Tab: Smart View (Schnelleinstellungen) spiegelt den ganzen Bildschirm.';
   function paint() {
     ui.querySelectorAll('[data-cm]').forEach(b => { const on = b.dataset.cm === mode; b.style.background = on ? '#eef2ff' : '#fff'; b.style.borderColor = on ? '#4f46e5' : '#cbd5e1'; b.style.color = on ? '#4338ca' : '#0f172a'; });
     $('#castStop').style.display = active ? 'block' : 'none';
@@ -2020,11 +2026,11 @@ function openAppFeedback(){var q=new URLSearchParams({app:'sekzufall',version:'2
   }
   function openWin() {
     win = window.open(url(), 'castwin', 'popup,width=1280,height=720');
-    if (!win) { info('Das Fenster wurde blockiert. Bitte Pop-ups erlauben.'); return; }
+    if (!win) { info('Das Fenster wurde blockiert. Bitte Pop-ups erlauben.', true); return; }
     begin();
   }
   async function startCast() {
-    if (!('PresentationRequest' in window)) { info('Dieser Browser kann nicht casten. Nimm «Als Fenster öffnen» oder spiegle den Bildschirm.'); return; }
+    if (!('PresentationRequest' in window)) { info('Dieser Browser kann nicht casten. ' + HINT, true); return; }
     try {
       const req = new PresentationRequest([url()]);
       conn = await req.start();
@@ -2033,7 +2039,7 @@ function openAppFeedback(){var q=new URLSearchParams({app:'sekzufall',version:'2
       begin();
     } catch (e) {
       conn = null;
-      info(e && e.name === 'NotFoundError' ? 'Kein Cast-Bildschirm gefunden (gleiches WLAN?). Alternativ «Als Fenster öffnen».' : 'Cast abgebrochen oder nicht möglich.');
+      info(e && e.name === 'NotFoundError' ? 'Kein Cast-Bildschirm gefunden (gleiches WLAN? Auf dem Tablet findet Chrome oft keinen). ' + HINT : (e && e.name === 'AbortError' ? 'Cast abgebrochen.' : 'Cast nicht möglich (' + ((e && e.name) || 'Fehler') + '). ' + HINT), !(e && e.name === 'AbortError'));
     }
   }
   $('#castBtn').onclick = () => { const p = $('#castPanel'); p.style.display = p.style.display === 'none' ? 'block' : 'none'; paint(); };
