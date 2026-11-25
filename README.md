@@ -8,6 +8,7 @@ Live-App: https://novarion-desk.github.io/sek-zufall/
 |---|---|
 | `index.html` | Aktuelle Version der App |
 | `manifest.webmanifest`, `sw.js`, `icons/` | Installierbar als App (Chrome: Menü → «App installieren») |
+| `tailwind.css`, `vendor/` | Design, Icons, Firebase und Schrift lokal (offline-fähig). `tailwind.css` bei neuen Klassen neu bauen |
 | `versions/vX/` | Archiv älterer Versionen – jede ist direkt aufrufbar |
 | `CHANGELOG.md` | Was sich in welcher Version geändert hat |
 

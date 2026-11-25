@@ -11,15 +11,14 @@
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-title" content="Zufall">
     <meta name="mobile-web-app-capable" content="yes">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
-    <!-- Firebase SDKs (Compat v10 für direkte HTML-Nutzung) -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="vendor/lucide.min.js"></script>
+    <!-- Firebase SDKs (Compat v10, selbst gehostet in vendor/, damit die App offline startet) -->
+    <script src="vendor/firebase-app-compat.js"></script>
+    <script src="vendor/firebase-auth-compat.js"></script>
+    <script src="vendor/firebase-firestore-compat.js"></script>
     <script src="drive-backup.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        @font-face { font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap; src: url('vendor/fonts/inter-latin-wght-normal.woff2') format('woff2-variations'), url('vendor/fonts/inter-latin-wght-normal.woff2') format('woff2'); }
         body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
 
         @keyframes popReveal {
@@ -34,6 +33,7 @@
           #printSheet .pc div{font-size:12pt;padding:1mm 0}#printSheet small{color:#555}}
         .animate-reveal { animation: popReveal 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     </style>
+    <link rel="stylesheet" href="tailwind.css">
 </head>
 <body class="bg-[#F4F6FA] text-slate-800 min-h-screen flex flex-col antialiased selection:bg-indigo-100 selection:text-indigo-900">
 
@@ -508,7 +508,7 @@
     </div>
 
     <script>
-        const APP_VERSION = '2.9';
+        const APP_VERSION = '2.10';
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
@@ -1923,7 +1923,7 @@ function timerBeep() {
     showToast('Zeit ist um!');
 }
 
-function openAppFeedback(){var q=new URLSearchParams({app:'sekzufall',version:'2.7',geraet:(navigator.userAgent||'').slice(0,120)});window.open('https://tally.so/r/GeR9re?'+q.toString(),'_blank','noopener');}
+function openAppFeedback(){var q=new URLSearchParams({app:'sekzufall',version:'2.10',geraet:(navigator.userAgent||'').slice(0,120)});window.open('https://tally.so/r/GeR9re?'+q.toString(),'_blank','noopener');}
 
 /* ===== Zurück-Geste (Handy): ein Schritt zurück statt App schliessen ===== */
 (function(){

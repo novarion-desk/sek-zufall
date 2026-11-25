@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 2.10 – 25.11.2026
+- Neu: **Offline nutzbar.** Die App wird beim ersten Öffnen zwischengespeichert und startet danach auch ohne Netz (Gast-/Demo-Modus vollständig). Mit Netz kommt immer die neueste Version. Anmelden, Cloud-Daten, Google-Drive-Sicherung und Feedback brauchen weiterhin Netz.
+- Alle Bausteine liegen jetzt in der App statt bei fremden Servern: Design (`tailwind.css`), Icons (Lucide), Firebase und die Schrift Inter (alles in `vendor/`). Es gehen keine IP-Adressen mehr an Google Fonts, Tailwind oder unpkg.
+- Fix: Feedback-Formular meldete noch Version 2.7.
+
 ## Version 2.9 – 24.11.2026
 - Neu: Der 📺-Knopf «Auf Bildschirm senden» erscheint nur noch mit Lehrer-Login (nicht im Gast-/Demo-Modus)
 - Besser: Meldungen im Cast-Fenster sind gross und gut lesbar und nennen den Grund (z. B. kein Cast-Gerät gefunden) samt Tipp für das Galaxy Tab (Smart View)
